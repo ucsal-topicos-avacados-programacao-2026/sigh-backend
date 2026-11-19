@@ -1,8 +1,10 @@
 package com.sigh.sigh.project.triagem.controller;
 
+import com.sigh.sigh.project.comum.erro.IAIndisponivelException;
 import com.sigh.sigh.project.config.MethodSecurityConfig;
 import com.sigh.sigh.project.triagem.entity.CorRisco;
 import com.sigh.sigh.project.triagem.service.FilaAtendimentoService;
+import com.sigh.sigh.project.triagem.service.SugestaoRiscoService;
 import com.sigh.sigh.project.triagem.service.TriagemService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +26,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(TriagemController.class)
@@ -43,6 +46,28 @@ class TriagemControllerTest {
 
 	@MockitoBean
 	private FilaAtendimentoService filaAtendimentoService;
+
+	@MockitoBean
+	private SugestaoRiscoService sugestaoRiscoService;
+
+	@Test
+	@WithMockUser(username = "enfermeira.teste", roles = "ENFERMEIRO")
+	void iaForaDoArInformaAFalhaParaSeguirComAClassificacaoManual() throws Exception {
+		when(sugestaoRiscoService.sugerirRisco(TRIAGEM_ID, "enfermeira.teste"))
+				.thenThrow(new IAIndisponivelException("O serviço de IA não respondeu. Faça a classificação manual."));
+
+		mockMvc.perform(post("/triagens/{id}/sugestao", TRIAGEM_ID).with(csrf()))
+				.andExpect(status().isServiceUnavailable())
+				.andExpect(jsonPath("$.detail").value("O serviço de IA não respondeu. Faça a classificação manual."));
+	}
+
+	@Test
+	@WithMockUser(roles = "MEDICO")
+	void medicoNaoPedeSugestaoDeRisco() throws Exception {
+		mockMvc.perform(post("/triagens/{id}/sugestao", TRIAGEM_ID).with(csrf()))
+				.andExpect(status().isForbidden());
+		verifyNoInteractions(sugestaoRiscoService);
+	}
 
 	@Test
 	@WithMockUser(username = "enfermeira.teste", roles = "ENFERMEIRO")
