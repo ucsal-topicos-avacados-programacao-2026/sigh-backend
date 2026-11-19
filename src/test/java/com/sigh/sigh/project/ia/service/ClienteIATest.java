@@ -28,13 +28,14 @@ class ClienteIATest {
 	private static final String ENDERECO_IA = "http://ia.teste";
 	private static final IAProperties CONFIGURACAO = new IAProperties(
 			ENDERECO_IA, "modelo-teste", null, 0, Duration.ofSeconds(5), 20,
-			new ByteArrayResource("Instruções de teste".getBytes(StandardCharsets.UTF_8)));
+			new ByteArrayResource("Instruções de triagem".getBytes(StandardCharsets.UTF_8)),
+			new ByteArrayResource("Instruções de resumo".getBytes(StandardCharsets.UTF_8)));
 
 	private MockRestServiceServer servidorIA;
 	private ClienteIA clienteIA;
 
 	@BeforeEach
-	void prepararServidorSimulado() throws Exception {
+	public void prepararServidorSimulado() throws Exception {
 		RestClient.Builder construtor = RestClient.builder();
 		servidorIA = MockRestServiceServer.bindTo(construtor).build();
 		clienteIA = new ClienteIA(construtor.baseUrl(ENDERECO_IA).build(), CONFIGURACAO, JsonMapper.builder().build());
@@ -81,7 +82,28 @@ class ClienteIATest {
 
 		assertThatThrownBy(() -> clienteIA.classificarRisco("Sintomas: tosse"))
 				.isInstanceOf(IAIndisponivelException.class)
-				.hasMessageContaining("classificação manual");
+				.hasMessageContaining("sem a sugestão da IA");
+	}
+
+	@Test
+	void resumoEhPedidoEmTextoLivreComAsInstrucoesDeResumo() {
+		servidorIA.expect(requestTo(ENDERECO_IA + "/v1/chat/completions"))
+				.andExpect(jsonPath("$.messages[0].content").value("Instruções de resumo"))
+				.andExpect(jsonPath("$.response_format").doesNotExist())
+				.andRespond(withSuccess(respostaComConteudo("  Alergias: dipirona.  "), MediaType.APPLICATION_JSON));
+
+		String resumo = clienteIA.resumirHistorico("- 2026-09-20 | Hospital | ALERGIA: dipirona");
+
+		assertThat(resumo).isEqualTo("Alergias: dipirona.");
+	}
+
+	@Test
+	void resumoVazioEhRecusado() {
+		servidorIA.expect(requestTo(ENDERECO_IA + "/v1/chat/completions"))
+				.andRespond(withSuccess(respostaComConteudo(" "), MediaType.APPLICATION_JSON));
+
+		assertThatThrownBy(() -> clienteIA.resumirHistorico("- registro"))
+				.isInstanceOf(IAIndisponivelException.class);
 	}
 
 	private String respostaComConteudo(String conteudo) {

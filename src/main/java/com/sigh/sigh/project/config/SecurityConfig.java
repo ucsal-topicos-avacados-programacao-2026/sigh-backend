@@ -33,6 +33,7 @@ public class SecurityConfig {
 				.sessionManagement(sessao -> sessao.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(rotas -> rotas
 						.requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
+						.requestMatchers("/error").permitAll()
 						.requestMatchers("/auth/segundo-fator/**").hasAuthority(TokenService.SEGUNDO_FATOR_PENDENTE)
 						.anyRequest().hasAnyRole(nomesDosPerfis()))
 				.oauth2ResourceServer(servidor -> servidor.jwt(Customizer.withDefaults()));

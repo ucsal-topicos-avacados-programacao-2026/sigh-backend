@@ -13,6 +13,7 @@ public interface RegistroClinicoRepository extends JpaRepository<RegistroClinico
 
 	@Query("""
 			select r from RegistroClinico r
+			join fetch r.origem
 			where r.prontuario.id = :prontuarioId
 			and not exists (
 				select 1 from RestricaoAcesso restricao

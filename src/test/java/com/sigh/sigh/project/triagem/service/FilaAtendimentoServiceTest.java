@@ -36,10 +36,13 @@ class FilaAtendimentoServiceTest {
 	private FilaAtendimentoService filaAtendimentoService;
 
 	@BeforeEach
-	void configurarTemposMaximos() {
+	public void configurarTemposMaximos() {
 		TriagemProperties tempos = new TriagemProperties(Map.of(
+				CorRisco.VERMELHO, Duration.ZERO,
 				CorRisco.LARANJA, Duration.ofMinutes(10),
-				CorRisco.AMARELO, Duration.ofMinutes(60)));
+				CorRisco.AMARELO, Duration.ofMinutes(60),
+				CorRisco.VERDE, Duration.ofMinutes(120),
+				CorRisco.AZUL, Duration.ofMinutes(240)));
 		filaAtendimentoService = new FilaAtendimentoService(triagemRepository, tempos);
 	}
 

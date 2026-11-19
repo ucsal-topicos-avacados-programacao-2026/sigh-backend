@@ -19,5 +19,6 @@ public record IAProperties(
 		@PositiveOrZero double temperatura,
 		@NotNull Duration tempoLimite,
 		@Positive int limiteRegistrosHistorico,
-		@NotNull Resource instrucoesTriagem) {
+		@NotNull Resource instrucoesTriagem,
+		@NotNull Resource instrucoesResumo) {
 }
