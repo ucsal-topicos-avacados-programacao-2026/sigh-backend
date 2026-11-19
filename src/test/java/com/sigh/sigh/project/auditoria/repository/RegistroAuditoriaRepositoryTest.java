@@ -45,7 +45,7 @@ class RegistroAuditoriaRepositoryTest {
 	private RegistroAuditoria acessoComum;
 
 	@BeforeEach
-	void prepararAcessos() {
+	public void prepararAcessos() {
 		publica = salvarInstituicao("Hospital Público Fictício", TipoInstituicao.PUBLICA);
 		privada = salvarInstituicao("Hospital Privado Fictício", TipoInstituicao.PRIVADA);
 		medico = salvarUsuario("medico.teste", "Médico Fictício");
