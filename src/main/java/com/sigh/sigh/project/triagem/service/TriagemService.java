@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -25,6 +26,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class TriagemService {
+
+	private static final Set<StatusAtendimento> STATUS_QUE_ACEITAM_TRIAGEM =
+			EnumSet.of(StatusAtendimento.ABERTO, StatusAtendimento.EM_TRIAGEM);
 
 	private final TriagemRepository triagemRepository;
 	private final AtendimentoRepository atendimentoRepository;
@@ -35,8 +39,8 @@ public class TriagemService {
 	public TriagemResponseDTO registrar(TriagemRequestDTO dados, String loginEnfermeiro) {
 		Atendimento atendimento = atendimentoRepository.findById(dados.atendimentoId())
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Atendimento não encontrado."));
-		if (atendimento.getStatus() == StatusAtendimento.ENCERRADO) {
-			throw new RegraNegocioException("O atendimento já foi encerrado.");
+		if (!STATUS_QUE_ACEITAM_TRIAGEM.contains(atendimento.getStatus())) {
+			throw new RegraNegocioException("Só é possível triar atendimentos abertos ou em triagem.");
 		}
 		Triagem triagem = new Triagem();
 		triagem.setAtendimento(atendimento);

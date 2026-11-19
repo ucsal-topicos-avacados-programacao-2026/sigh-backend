@@ -39,7 +39,7 @@ class RegistroClinicoRepositoryTest {
 	private Instituicao instituicao;
 
 	@BeforeEach
-	void prepararProntuario() {
+	public void prepararProntuario() {
 		instituicao = new Instituicao();
 		instituicao.setNome("Hospital Público Fictício");
 		instituicao.setTipo(TipoInstituicao.PUBLICA);

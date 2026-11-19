@@ -32,22 +32,36 @@ public class ClienteIA {
 	private final IAProperties iaProperties;
 	private final JsonMapper leitorJson;
 	private final String instrucoesTriagem;
+	private final String instrucoesResumo;
 
 	public ClienteIA(RestClient clienteHttpIA, IAProperties iaProperties, JsonMapper leitorJson) throws IOException {
 		this.clienteHttpIA = clienteHttpIA;
 		this.iaProperties = iaProperties;
 		this.leitorJson = leitorJson;
 		this.instrucoesTriagem = iaProperties.instrucoesTriagem().getContentAsString(StandardCharsets.UTF_8);
+		this.instrucoesResumo = iaProperties.instrucoesResumo().getContentAsString(StandardCharsets.UTF_8);
 	}
 
 	public CorRisco classificarRisco(String descricaoDoCaso) {
-		PedidoChatIA pedido = new PedidoChatIA(
+		String conteudo = enviar(montarPedido(instrucoesTriagem, descricaoDoCaso, FormatoRespostaIA.classificacaoDeRisco()));
+		return lerCor(conteudo);
+	}
+
+	public String resumirHistorico(String historico) {
+		String resumo = enviar(montarPedido(instrucoesResumo, historico, null)).strip();
+		if (resumo.isEmpty()) {
+			throw respostaInvalida();
+		}
+		return resumo;
+	}
+
+	private PedidoChatIA montarPedido(String instrucoes, String conteudo, FormatoRespostaIA formato) {
+		return new PedidoChatIA(
 				iaProperties.modelo(),
-				List.of(MensagemChatIA.doSistema(instrucoesTriagem), MensagemChatIA.doUsuario(descricaoDoCaso)),
+				List.of(MensagemChatIA.doSistema(instrucoes), MensagemChatIA.doUsuario(conteudo)),
 				iaProperties.temperatura(),
 				RACIOCINIO_DESLIGADO,
-				FormatoRespostaIA.classificacaoDeRisco());
-		return lerCor(enviar(pedido));
+				formato);
 	}
 
 	private String enviar(PedidoChatIA pedido) {
@@ -60,7 +74,7 @@ public class ClienteIA {
 			return resposta == null ? "" : resposta.conteudo();
 		} catch (RestClientException erro) {
 			log.warn("Serviço de IA indisponível: {}", erro.getClass().getSimpleName());
-			throw new IAIndisponivelException("O serviço de IA não respondeu. Faça a classificação manual.");
+			throw new IAIndisponivelException("O serviço de IA não respondeu. Siga sem a sugestão da IA.");
 		}
 	}
 
@@ -81,7 +95,7 @@ public class ClienteIA {
 	}
 
 	private IAIndisponivelException respostaInvalida() {
-		log.warn("Serviço de IA devolveu uma classificação fora das cores do protocolo");
-		return new IAIndisponivelException("A IA devolveu uma classificação inválida. Faça a classificação manual.");
+		log.warn("Serviço de IA devolveu uma resposta fora do formato esperado");
+		return new IAIndisponivelException("A IA devolveu uma resposta inválida. Siga sem a sugestão da IA.");
 	}
 }

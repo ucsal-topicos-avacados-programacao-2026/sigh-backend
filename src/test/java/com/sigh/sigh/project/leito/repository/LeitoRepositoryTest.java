@@ -30,7 +30,7 @@ class LeitoRepositoryTest {
 	private Instituicao privada;
 
 	@BeforeEach
-	void prepararLeitos() {
+	public void prepararLeitos() {
 		publica = salvarInstituicao("Hospital Público Fictício", TipoInstituicao.PUBLICA);
 		privada = salvarInstituicao("Hospital Privado Fictício", TipoInstituicao.PRIVADA);
 		salvarLeito(publica, "UTI-01", CategoriaLeito.UTI, StatusLeito.LIVRE);
