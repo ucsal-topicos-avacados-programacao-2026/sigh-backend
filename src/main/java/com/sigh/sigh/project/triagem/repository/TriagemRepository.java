@@ -18,6 +18,9 @@ public interface TriagemRepository extends JpaRepository<Triagem, UUID> {
 			where a.instituicao.id = :instituicaoId
 			and a.status = com.sigh.sigh.project.prontuario.entity.StatusAtendimento.EM_TRIAGEM
 			and t.corConfirmada is not null
+			and not exists (
+				select 1 from Triagem posterior
+				where posterior.atendimento = a and posterior.confirmadaEm > t.confirmadaEm)
 			order by case t.corConfirmada
 				when com.sigh.sigh.project.triagem.entity.CorRisco.VERMELHO then 1
 				when com.sigh.sigh.project.triagem.entity.CorRisco.LARANJA then 2
@@ -31,6 +34,9 @@ public interface TriagemRepository extends JpaRepository<Triagem, UUID> {
 			where a.instituicao.id = :instituicaoId
 			and a.status = com.sigh.sigh.project.prontuario.entity.StatusAtendimento.EM_TRIAGEM
 			and t.corConfirmada is not null
+			and not exists (
+				select 1 from Triagem posterior
+				where posterior.atendimento = a and posterior.confirmadaEm > t.confirmadaEm)
 			""")
 	Page<Triagem> buscarFila(UUID instituicaoId, Pageable paginacao);
 }

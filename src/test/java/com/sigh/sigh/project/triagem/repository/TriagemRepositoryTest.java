@@ -41,7 +41,7 @@ class TriagemRepositoryTest {
 	private int pacientesCriados;
 
 	@BeforeEach
-	void prepararCadastros() {
+	public void prepararCadastros() {
 		instituicao = new Instituicao();
 		instituicao.setNome("Hospital Público Fictício");
 		instituicao.setTipo(TipoInstituicao.PUBLICA);
@@ -75,6 +75,18 @@ class TriagemRepositoryTest {
 		assertThat(nomesNaFila()).containsExactly("Paciente Confirmado");
 	}
 
+	@Test
+	void pacienteRetriadoApareceUmaVezComACorMaisRecente() {
+		Atendimento atendimento = registrarTriagem("Paciente Que Piorou", INICIO, CorRisco.VERDE);
+		confirmarNovaTriagem(atendimento, CorRisco.LARANJA, INICIO.plusMinutes(50));
+		banco.flush();
+		banco.clear();
+
+		List<Triagem> fila = triagemRepository.buscarFila(instituicao.getId(), Pageable.unpaged()).getContent();
+
+		assertThat(fila).singleElement().extracting(Triagem::getCorConfirmada).isEqualTo(CorRisco.LARANJA);
+	}
+
 	private List<String> nomesNaFila() {
 		banco.flush();
 		banco.clear();
@@ -83,7 +95,7 @@ class TriagemRepositoryTest {
 				.toList();
 	}
 
-	private void registrarTriagem(String nomePaciente, LocalDateTime chegadaEm, CorRisco corConfirmada) {
+	private Atendimento registrarTriagem(String nomePaciente, LocalDateTime chegadaEm, CorRisco corConfirmada) {
 		Atendimento atendimento = new Atendimento();
 		atendimento.setProntuario(criarProntuario(nomePaciente));
 		atendimento.setInstituicao(instituicao);
@@ -97,7 +109,20 @@ class TriagemRepositoryTest {
 		triagem.setSinaisVitais(new SinaisVitais());
 		triagem.setRegistrador(enfermeiro);
 		triagem.setCorConfirmada(corConfirmada);
+		triagem.setConfirmadaEm(corConfirmada == null ? null : chegadaEm.plusMinutes(5));
 		banco.persist(triagem);
+		return atendimento;
+	}
+
+	private void confirmarNovaTriagem(Atendimento atendimento, CorRisco cor, LocalDateTime confirmadaEm) {
+		Triagem novaTriagem = new Triagem();
+		novaTriagem.setAtendimento(atendimento);
+		novaTriagem.setSintomas("Piora dos sintomas");
+		novaTriagem.setSinaisVitais(new SinaisVitais());
+		novaTriagem.setRegistrador(enfermeiro);
+		novaTriagem.setCorConfirmada(cor);
+		novaTriagem.setConfirmadaEm(confirmadaEm);
+		banco.persist(novaTriagem);
 	}
 
 	private Prontuario criarProntuario(String nomePaciente) {

@@ -75,6 +75,17 @@ class TriagemServiceTest {
 	}
 
 	@Test
+	void atendimentoJaComOMedicoNaoVoltaParaTriagem() {
+		Atendimento atendimento = novoAtendimento(StatusAtendimento.EM_ATENDIMENTO);
+		when(atendimentoRepository.findById(atendimento.getId())).thenReturn(Optional.of(atendimento));
+
+		assertThatThrownBy(() -> triagemService.registrar(
+				new TriagemRequestDTO(atendimento.getId(), "Dor torácica", SINAIS_VITAIS), LOGIN_ENFERMEIRO))
+				.isInstanceOf(RegraNegocioException.class);
+		assertThat(atendimento.getStatus()).isEqualTo(StatusAtendimento.EM_ATENDIMENTO);
+	}
+
+	@Test
 	void enfermeiroConfirmaOuAlteraAClassificacao() {
 		Triagem triagem = novaTriagem();
 		triagem.setCorSugerida(CorRisco.AMARELO);
