@@ -1,7 +1,7 @@
 package com.sigh.sigh.project.triagem.service;
 
 import com.sigh.sigh.project.prontuario.entity.Atendimento;
-import com.sigh.sigh.project.triagem.config.TriagemProperties;
+import com.sigh.sigh.project.triagem.config.TempoMaximoEsperaProperties;
 import com.sigh.sigh.project.triagem.dto.PacienteNaFilaDTO;
 import com.sigh.sigh.project.triagem.entity.Triagem;
 import com.sigh.sigh.project.triagem.repository.TriagemRepository;
@@ -20,7 +20,7 @@ import java.util.UUID;
 public class FilaAtendimentoService {
 
 	private final TriagemRepository triagemRepository;
-	private final TriagemProperties triagemProperties;
+	private final TempoMaximoEsperaProperties tempoMaximoEspera;
 
 	@Transactional(readOnly = true)
 	public Page<PacienteNaFilaDTO> consultarFila(UUID instituicaoId, Pageable paginacao) {
@@ -32,7 +32,7 @@ public class FilaAtendimentoService {
 	private PacienteNaFilaDTO paraPacienteNaFila(Triagem triagem, LocalDateTime agora) {
 		Atendimento atendimento = triagem.getAtendimento();
 		Duration espera = Duration.between(atendimento.getChegadaEm(), agora);
-		Duration tempoMaximo = triagemProperties.tempoMaximoDe(triagem.getCorConfirmada());
+		Duration tempoMaximo = tempoMaximoEspera.da(triagem.getCorConfirmada());
 		return new PacienteNaFilaDTO(
 				triagem.getId(),
 				atendimento.getId(),

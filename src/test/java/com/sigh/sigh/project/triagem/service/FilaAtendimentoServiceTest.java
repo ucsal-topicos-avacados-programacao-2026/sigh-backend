@@ -3,7 +3,7 @@ package com.sigh.sigh.project.triagem.service;
 import com.sigh.sigh.project.paciente.entity.Paciente;
 import com.sigh.sigh.project.prontuario.entity.Atendimento;
 import com.sigh.sigh.project.prontuario.entity.Prontuario;
-import com.sigh.sigh.project.triagem.config.TriagemProperties;
+import com.sigh.sigh.project.triagem.config.TempoMaximoEsperaProperties;
 import com.sigh.sigh.project.triagem.dto.PacienteNaFilaDTO;
 import com.sigh.sigh.project.triagem.entity.CorRisco;
 import com.sigh.sigh.project.triagem.entity.Triagem;
@@ -19,7 +19,6 @@ import org.springframework.data.domain.Pageable;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,12 +36,8 @@ class FilaAtendimentoServiceTest {
 
 	@BeforeEach
 	public void configurarTemposMaximos() {
-		TriagemProperties tempos = new TriagemProperties(Map.of(
-				CorRisco.VERMELHO, Duration.ZERO,
-				CorRisco.LARANJA, Duration.ofMinutes(10),
-				CorRisco.AMARELO, Duration.ofMinutes(60),
-				CorRisco.VERDE, Duration.ofMinutes(120),
-				CorRisco.AZUL, Duration.ofMinutes(240)));
+		TempoMaximoEsperaProperties tempos = new TempoMaximoEsperaProperties(
+				Duration.ZERO, Duration.ofMinutes(10), Duration.ofMinutes(60), Duration.ofMinutes(120), Duration.ofMinutes(240));
 		filaAtendimentoService = new FilaAtendimentoService(triagemRepository, tempos);
 	}
 
