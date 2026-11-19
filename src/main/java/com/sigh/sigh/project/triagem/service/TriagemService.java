@@ -3,8 +3,10 @@ package com.sigh.sigh.project.triagem.service;
 import com.sigh.sigh.project.comum.erro.RecursoNaoEncontradoException;
 import com.sigh.sigh.project.comum.erro.RegraNegocioException;
 import com.sigh.sigh.project.prontuario.entity.Atendimento;
+import com.sigh.sigh.project.prontuario.entity.RegistroClinico;
 import com.sigh.sigh.project.prontuario.entity.StatusAtendimento;
 import com.sigh.sigh.project.prontuario.repository.AtendimentoRepository;
+import com.sigh.sigh.project.prontuario.repository.RegistroClinicoRepository;
 import com.sigh.sigh.project.triagem.dto.TriagemRequestDTO;
 import com.sigh.sigh.project.triagem.dto.TriagemResponseDTO;
 import com.sigh.sigh.project.triagem.entity.CorRisco;
@@ -16,7 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +28,7 @@ public class TriagemService {
 
 	private final TriagemRepository triagemRepository;
 	private final AtendimentoRepository atendimentoRepository;
+	private final RegistroClinicoRepository registroClinicoRepository;
 	private final UsuarioService usuarioService;
 
 	@Transactional
@@ -43,15 +48,34 @@ public class TriagemService {
 	}
 
 	@Transactional
+	public TriagemResponseDTO registrarSugestao(UUID triagemId, CorRisco corSugerida, Set<UUID> registrosUsados) {
+		Triagem triagem = buscarTriagemNaoConfirmada(triagemId);
+		triagem.setCorSugerida(corSugerida);
+		triagem.setFontesHistorico(referenciasDosRegistros(registrosUsados));
+		return TriagemResponseDTO.de(triagem);
+	}
+
+	@Transactional
 	public TriagemResponseDTO confirmarRisco(UUID triagemId, CorRisco cor, String loginEnfermeiro) {
+		Triagem triagem = buscarTriagemNaoConfirmada(triagemId);
+		triagem.setCorConfirmada(cor);
+		triagem.setConfirmadaEm(LocalDateTime.now());
+		triagem.setConfirmador(usuarioService.buscarPorLogin(loginEnfermeiro));
+		return TriagemResponseDTO.de(triagem);
+	}
+
+	private Triagem buscarTriagemNaoConfirmada(UUID triagemId) {
 		Triagem triagem = triagemRepository.findById(triagemId)
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Triagem não encontrada."));
 		if (triagem.getCorConfirmada() != null) {
 			throw new RegraNegocioException("A classificação desta triagem já foi confirmada.");
 		}
-		triagem.setCorConfirmada(cor);
-		triagem.setConfirmadaEm(LocalDateTime.now());
-		triagem.setConfirmador(usuarioService.buscarPorLogin(loginEnfermeiro));
-		return TriagemResponseDTO.de(triagem);
+		return triagem;
+	}
+
+	private Set<RegistroClinico> referenciasDosRegistros(Set<UUID> ids) {
+		return ids.stream()
+				.map(registroClinicoRepository::getReferenceById)
+				.collect(Collectors.toSet());
 	}
 }

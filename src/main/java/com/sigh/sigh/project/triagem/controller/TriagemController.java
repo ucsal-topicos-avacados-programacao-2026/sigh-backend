@@ -5,6 +5,7 @@ import com.sigh.sigh.project.triagem.dto.PacienteNaFilaDTO;
 import com.sigh.sigh.project.triagem.dto.TriagemRequestDTO;
 import com.sigh.sigh.project.triagem.dto.TriagemResponseDTO;
 import com.sigh.sigh.project.triagem.service.FilaAtendimentoService;
+import com.sigh.sigh.project.triagem.service.SugestaoRiscoService;
 import com.sigh.sigh.project.triagem.service.TriagemService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,12 +32,19 @@ public class TriagemController {
 
 	private final TriagemService triagemService;
 	private final FilaAtendimentoService filaAtendimentoService;
+	private final SugestaoRiscoService sugestaoRiscoService;
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	@PreAuthorize("hasRole('ENFERMEIRO')")
 	public TriagemResponseDTO registrar(@RequestBody @Valid TriagemRequestDTO dados, Principal usuario) {
 		return triagemService.registrar(dados, usuario.getName());
+	}
+
+	@PostMapping("/{triagemId}/sugestao")
+	@PreAuthorize("hasRole('ENFERMEIRO')")
+	public TriagemResponseDTO sugerirRisco(@PathVariable UUID triagemId, Principal usuario) {
+		return sugestaoRiscoService.sugerirRisco(triagemId, usuario.getName());
 	}
 
 	@PostMapping("/{triagemId}/confirmacao")
