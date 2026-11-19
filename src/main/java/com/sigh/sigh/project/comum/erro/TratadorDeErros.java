@@ -40,6 +40,11 @@ public class TratadorDeErros {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
 	}
 
+	@ExceptionHandler(IAIndisponivelException.class)
+	public ProblemDetail iaIndisponivel(IAIndisponivelException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+	}
+
 	@ExceptionHandler(RegraNegocioException.class)
 	public ProblemDetail regraNegocio(RegraNegocioException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage());
