@@ -13,12 +13,12 @@ import org.springframework.context.annotation.Configuration;
 public class SegundoFatorConfig {
 
 	@Bean
-	SecretGenerator geradorDeSegredo() {
+	public SecretGenerator geradorDeSegredo() {
 		return new DefaultSecretGenerator();
 	}
 
 	@Bean
-	CodeVerifier verificadorDeCodigo() {
+	public CodeVerifier verificadorDeCodigo() {
 		return new DefaultCodeVerifier(new DefaultCodeGenerator(), new SystemTimeProvider());
 	}
 }

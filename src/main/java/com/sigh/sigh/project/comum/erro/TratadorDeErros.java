@@ -15,7 +15,7 @@ import java.util.TreeMap;
 public class TratadorDeErros {
 
 	@ExceptionHandler(MethodArgumentNotValidException.class)
-	ProblemDetail validacao(MethodArgumentNotValidException ex) {
+	public ProblemDetail validacao(MethodArgumentNotValidException ex) {
 		Map<String, String> campos = new TreeMap<>();
 		for (FieldError erro : ex.getBindingResult().getFieldErrors()) {
 			campos.putIfAbsent(erro.getField(), erro.getDefaultMessage());
@@ -26,22 +26,22 @@ public class TratadorDeErros {
 	}
 
 	@ExceptionHandler(HttpMessageNotReadableException.class)
-	ProblemDetail corpoIlegivel(HttpMessageNotReadableException ex) {
+	public ProblemDetail corpoIlegivel(HttpMessageNotReadableException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Corpo da requisição inválido.");
 	}
 
 	@ExceptionHandler(RecursoNaoEncontradoException.class)
-	ProblemDetail naoEncontrado(RecursoNaoEncontradoException ex) {
+	public ProblemDetail naoEncontrado(RecursoNaoEncontradoException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
 	}
 
 	@ExceptionHandler(CredenciaisInvalidasException.class)
-	ProblemDetail credenciaisInvalidas(CredenciaisInvalidasException ex) {
+	public ProblemDetail credenciaisInvalidas(CredenciaisInvalidasException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
 	}
 
 	@ExceptionHandler(RegraNegocioException.class)
-	ProblemDetail regraNegocio(RegraNegocioException ex) {
+	public ProblemDetail regraNegocio(RegraNegocioException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage());
 	}
 }
