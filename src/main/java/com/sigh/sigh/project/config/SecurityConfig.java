@@ -27,7 +27,7 @@ import java.util.Arrays;
 public class SecurityConfig {
 
 	@Bean
-	SecurityFilterChain filtroDeSeguranca(HttpSecurity http) throws Exception {
+	public SecurityFilterChain filtroDeSeguranca(HttpSecurity http) throws Exception {
 		http
 				.csrf(AbstractHttpConfigurer::disable)
 				.sessionManagement(sessao -> sessao.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -40,22 +40,22 @@ public class SecurityConfig {
 	}
 
 	@Bean
-	PasswordEncoder codificadorDeSenha() {
+	public PasswordEncoder codificadorDeSenha() {
 		return new BCryptPasswordEncoder();
 	}
 
 	@Bean
-	JwtEncoder codificadorDeToken(JwtProperties jwtProperties) {
+	public JwtEncoder codificadorDeToken(JwtProperties jwtProperties) {
 		return new NimbusJwtEncoder(new ImmutableSecret<>(jwtProperties.chave()));
 	}
 
 	@Bean
-	JwtDecoder decodificadorDeToken(JwtProperties jwtProperties) {
+	public JwtDecoder decodificadorDeToken(JwtProperties jwtProperties) {
 		return NimbusJwtDecoder.withSecretKey(jwtProperties.chave()).macAlgorithm(MacAlgorithm.HS256).build();
 	}
 
 	@Bean
-	JwtAuthenticationConverter conversorDeToken() {
+	public JwtAuthenticationConverter conversorDeToken() {
 		JwtGrantedAuthoritiesConverter autorizacoes = new JwtGrantedAuthoritiesConverter();
 		autorizacoes.setAuthoritiesClaimName(TokenService.CLAIM_AUTORIZACOES);
 		autorizacoes.setAuthorityPrefix("");
