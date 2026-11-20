@@ -20,6 +20,16 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Único ponto que decide quais registros clínicos um atendimento pode ver. Triagem com IA, resumo
+ * por IA e a consulta do profissional passam por aqui, então a mesma regra vale para todos (RF-009):
+ * <ul>
+ *   <li>a instituição sempre vê os registros que ela mesma produziu;</li>
+ *   <li>os das outras instituições dependem do consentimento amplo (RF-002, RN-007);</li>
+ *   <li>registros restritos pelo paciente ficam de fora, salvo autorização adicional para a instituição;</li>
+ *   <li>o acesso de emergência (RN-003) mostra tudo, depois de registrar a justificativa.</li>
+ * </ul>
+ */
 @Service
 @RequiredArgsConstructor
 public class HistoricoAutorizadoService {
@@ -29,24 +39,51 @@ public class HistoricoAutorizadoService {
 	private final RegistroAuditoriaService registroAuditoriaService;
 	private final Clock clock;
 
+	/** Histórico visível para o atendimento, com o acesso registrado na auditoria (RF-008). */
 	@Transactional
 	public List<RegistroClinico> consultar(Atendimento atendimento, ConsultaHistoricoDTO consulta) {
 		Prontuario prontuario = atendimento.getProntuario();
-		// Regra de consentimento única para a rede, inclusive a revogação (RN-007): quem já tinha
-		// atendido o paciente até a revogação continua vendo o histórico; instituições novas, não.
-		if (!consentimentoService.podeCompartilharCom(prontuario.getPaciente().getId(),
-				atendimento.getInstituicao().getId())) {
-			return List.of();
-		}
-		List<RegistroClinico> historico = registroClinicoRepository.buscarHistoricoSemRestricao(
-				prontuario.getId(), LocalDateTime.now(clock), Limit.of(consulta.limiteDeRegistros()));
+		List<RegistroClinico> historico = registroClinicoRepository.historicoVisivel(prontuario.getId(),
+				atendimento.getInstituicao().getId(), compartilhadoCom(atendimento), LocalDateTime.now(clock),
+				Limit.of(consulta.limiteDeRegistros()));
 		if (!historico.isEmpty()) {
-			registrarAcesso(atendimento, consulta, historico);
+			registrarAcesso(atendimento, consulta, historico, false, null);
 		}
 		return historico;
 	}
 
-	private void registrarAcesso(Atendimento atendimento, ConsultaHistoricoDTO consulta, List<RegistroClinico> historico) {
+	/** Se há registros escondidos só pela restrição do paciente, que um acesso de emergência mostraria. */
+	@Transactional(readOnly = true)
+	public boolean possuiInformacoesRestritas(Atendimento atendimento) {
+		return registroClinicoRepository.contarRestritosOcultos(atendimento.getProntuario().getId(),
+				atendimento.getInstituicao().getId(), compartilhadoCom(atendimento), LocalDateTime.now(clock)) > 0;
+	}
+
+	/**
+	 * Acesso de emergência (RF-010, RN-003): a justificativa é gravada na auditoria antes de qualquer
+	 * registro ser devolvido. Se a gravação falhar, a transação é desfeita e nada é exibido.
+	 */
+	@Transactional
+	public List<RegistroClinico> consultarEmEmergencia(Atendimento atendimento, ConsultaHistoricoDTO consulta,
+			String justificativa) {
+		List<RegistroClinico> historico = registroClinicoRepository.historicoCompleto(atendimento.getProntuario().getId());
+		registrarAcesso(atendimento, consulta, historico, true, justificativa);
+		return historico;
+	}
+
+	/** Registros do prontuário cobertos por restrição vigente do paciente. */
+	@Transactional(readOnly = true)
+	public Set<UUID> restritos(Prontuario prontuario) {
+		return Set.copyOf(registroClinicoRepository.restritos(prontuario.getId(), LocalDateTime.now(clock)));
+	}
+
+	private boolean compartilhadoCom(Atendimento atendimento) {
+		return consentimentoService.podeCompartilharCom(atendimento.getProntuario().getPaciente().getId(),
+				atendimento.getInstituicao().getId());
+	}
+
+	private void registrarAcesso(Atendimento atendimento, ConsultaHistoricoDTO consulta, List<RegistroClinico> historico,
+			boolean emergencia, String justificativa) {
 		Set<UUID> registrosAcessados = historico.stream().map(RegistroClinico::getId).collect(Collectors.toSet());
 		registroAuditoriaService.registrarAcesso(new AcessoProntuarioDTO(
 				atendimento.getProntuario().getId(),
@@ -54,8 +91,8 @@ public class HistoricoAutorizadoService {
 				consulta.perfil(),
 				atendimento.getInstituicao().getId(),
 				consulta.finalidade(),
-				false,
-				null,
+				emergencia,
+				justificativa,
 				registrosAcessados));
 	}
 }
