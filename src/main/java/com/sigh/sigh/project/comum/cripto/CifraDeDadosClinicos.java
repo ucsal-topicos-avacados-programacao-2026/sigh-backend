@@ -52,7 +52,9 @@ public class CifraDeDadosClinicos {
 			if (partes.length != 2) {
 				throw new IllegalStateException("sigh.cripto.chaves-anteriores deve ter o formato id:chaveBase64,...");
 			}
-			chaves.putIfAbsent(validarId(partes[0]), chave(partes[1], "sigh.cripto.chaves-anteriores"));
+			if (chaves.putIfAbsent(validarId(partes[0]), chave(partes[1], "sigh.cripto.chaves-anteriores")) != null) {
+				throw new IllegalStateException("Id de chave repetido em sigh.cripto.chaves-anteriores.");
+			}
 		}
 	}
 
