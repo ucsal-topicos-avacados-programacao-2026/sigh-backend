@@ -3,6 +3,8 @@ package com.sigh.sigh.project.leito.controller;
 import com.sigh.sigh.project.leito.dto.AltaRequestDTO;
 import com.sigh.sigh.project.leito.dto.InternacaoRequestDTO;
 import com.sigh.sigh.project.leito.dto.InternacaoResponseDTO;
+import com.sigh.sigh.project.leito.dto.SolicitacaoTransferenciaRequestDTO;
+import com.sigh.sigh.project.leito.dto.SolicitacaoTransferenciaResponseDTO;
 import com.sigh.sigh.project.leito.dto.TransferenciaRequestDTO;
 import com.sigh.sigh.project.leito.service.InternacaoService;
 import jakarta.validation.Valid;
@@ -37,6 +39,14 @@ public class InternacaoController {
 	public InternacaoResponseDTO transferir(@PathVariable UUID internacaoId,
 			@RequestBody @Valid TransferenciaRequestDTO dados, Principal usuario) {
 		return internacaoService.transferir(internacaoId, dados.leitoDestinoId(), usuario.getName());
+	}
+
+	/** Transferência para outra instituição da rede: pedido que o destino aceita ou recusa (BE-21). */
+	@PostMapping("/{internacaoId}/solicitacoes-transferencia")
+	@ResponseStatus(HttpStatus.CREATED)
+	public SolicitacaoTransferenciaResponseDTO solicitarTransferencia(@PathVariable UUID internacaoId,
+			@RequestBody @Valid SolicitacaoTransferenciaRequestDTO dados, Principal usuario) {
+		return internacaoService.solicitarTransferencia(internacaoId, dados, usuario.getName());
 	}
 
 	@PostMapping("/{internacaoId}/alta")

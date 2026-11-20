@@ -1,5 +1,8 @@
 package com.sigh.sigh.project.leito.service;
 
+import com.sigh.sigh.project.instituicao.repository.InstituicaoRepository;
+import com.sigh.sigh.project.leito.repository.SolicitacaoTransferenciaRepository;
+import com.sigh.sigh.project.usuario.service.UsuarioService;
 import com.sigh.sigh.project.comum.erro.RegraNegocioException;
 import com.sigh.sigh.project.instituicao.entity.Instituicao;
 import com.sigh.sigh.project.leito.dto.InternacaoRequestDTO;
@@ -72,6 +75,15 @@ class InternacaoServiceTest {
 	@Mock
 	private VinculoService vinculoService;
 
+	@Mock
+	private SolicitacaoTransferenciaRepository solicitacaoRepository;
+
+	@Mock
+	private InstituicaoRepository instituicaoRepository;
+
+	@Mock
+	private UsuarioService usuarioService;
+
 	@InjectMocks
 	private InternacaoService internacaoService;
 
@@ -124,7 +136,7 @@ class InternacaoServiceTest {
 		Leito origem = novoLeito(StatusLeito.OCUPADO);
 		Leito destino = novoLeito(StatusLeito.LIVRE);
 		OcupacaoLeito ocupacaoAtual = novaOcupacao(origem, internacao);
-		when(internacaoRepository.findById(internacao.getId())).thenReturn(Optional.of(internacao));
+		when(internacaoRepository.findComBloqueioById(internacao.getId())).thenReturn(Optional.of(internacao));
 		when(leitoRepository.findComBloqueioById(destino.getId())).thenReturn(Optional.of(destino));
 		when(ocupacaoLeitoRepository.buscarOcupacaoAtual(internacao.getId())).thenReturn(Optional.of(ocupacaoAtual));
 
@@ -135,11 +147,28 @@ class InternacaoServiceTest {
 		assertThat(destino.getStatus()).isEqualTo(StatusLeito.OCUPADO);
 	}
 
+	/** BE-21: para leito de outra instituição, só por solicitação aceita pelo destino. */
+	@Test
+	void transferenciaDiretaParaLeitoDeOutraInstituicaoEhRecusada() {
+		Internacao internacao = novaInternacao();
+		Leito destino = novoLeito(StatusLeito.LIVRE);
+		Instituicao outroHospital = new Instituicao();
+		outroHospital.setId(UUID.randomUUID());
+		destino.setInstituicao(outroHospital);
+		when(internacaoRepository.findComBloqueioById(internacao.getId())).thenReturn(Optional.of(internacao));
+		when(leitoRepository.findComBloqueioById(destino.getId())).thenReturn(Optional.of(destino));
+
+		assertThatThrownBy(() -> internacaoService.transferir(internacao.getId(), destino.getId(), LOGIN_ADMINISTRATIVO))
+				.isInstanceOf(RegraNegocioException.class).hasMessageContaining("por solicitação");
+		assertThat(destino.getStatus()).isEqualTo(StatusLeito.LIVRE);
+		verify(ocupacaoLeitoRepository, never()).buscarOcupacaoAtual(any());
+	}
+
 	@Test
 	void transferirParaLeitoNaoLivreEhBloqueadoEMantemAOrigem() {
 		Internacao internacao = novaInternacao();
 		Leito destino = novoLeito(StatusLeito.BLOQUEADO);
-		when(internacaoRepository.findById(internacao.getId())).thenReturn(Optional.of(internacao));
+		when(internacaoRepository.findComBloqueioById(internacao.getId())).thenReturn(Optional.of(internacao));
 		when(leitoRepository.findComBloqueioById(destino.getId())).thenReturn(Optional.of(destino));
 
 		assertThatThrownBy(() -> internacaoService.transferir(internacao.getId(), destino.getId(), LOGIN_ADMINISTRATIVO))
@@ -152,7 +181,7 @@ class InternacaoServiceTest {
 		Internacao internacao = novaInternacao();
 		Leito leito = novoLeito(StatusLeito.OCUPADO);
 		RegistroClinico resumo = novoRegistro(TipoRegistro.RESUMO_ALTA, internacao.getProntuario());
-		when(internacaoRepository.findById(internacao.getId())).thenReturn(Optional.of(internacao));
+		when(internacaoRepository.findComBloqueioById(internacao.getId())).thenReturn(Optional.of(internacao));
 		when(registroClinicoRepository.findById(resumo.getId())).thenReturn(Optional.of(resumo));
 		when(ocupacaoLeitoRepository.buscarOcupacaoAtual(internacao.getId()))
 				.thenReturn(Optional.of(novaOcupacao(leito, internacao)));
@@ -168,7 +197,7 @@ class InternacaoServiceTest {
 	void darAltaComRegistroQueNaoEhResumoDeAltaEhBloqueado() {
 		Internacao internacao = novaInternacao();
 		RegistroClinico evolucao = novoRegistro(TipoRegistro.EVOLUCAO, internacao.getProntuario());
-		when(internacaoRepository.findById(internacao.getId())).thenReturn(Optional.of(internacao));
+		when(internacaoRepository.findComBloqueioById(internacao.getId())).thenReturn(Optional.of(internacao));
 		when(registroClinicoRepository.findById(evolucao.getId())).thenReturn(Optional.of(evolucao));
 
 		assertThatThrownBy(() -> internacaoService.darAlta(internacao.getId(), evolucao.getId(), LOGIN_ADMINISTRATIVO))
@@ -180,7 +209,7 @@ class InternacaoServiceTest {
 	void darAltaComResumoDeOutroProntuarioEhBloqueado() {
 		Internacao internacao = novaInternacao();
 		RegistroClinico resumo = novoRegistro(TipoRegistro.RESUMO_ALTA, novoProntuario());
-		when(internacaoRepository.findById(internacao.getId())).thenReturn(Optional.of(internacao));
+		when(internacaoRepository.findComBloqueioById(internacao.getId())).thenReturn(Optional.of(internacao));
 		when(registroClinicoRepository.findById(resumo.getId())).thenReturn(Optional.of(resumo));
 
 		assertThatThrownBy(() -> internacaoService.darAlta(internacao.getId(), resumo.getId(), LOGIN_ADMINISTRATIVO))
@@ -191,7 +220,7 @@ class InternacaoServiceTest {
 	void internacaoJaEncerradaNaoAceitaTransferencia() {
 		Internacao internacao = novaInternacao();
 		internacao.setAltaEm(LocalDateTime.now(clock));
-		when(internacaoRepository.findById(internacao.getId())).thenReturn(Optional.of(internacao));
+		when(internacaoRepository.findComBloqueioById(internacao.getId())).thenReturn(Optional.of(internacao));
 
 		assertThatThrownBy(() -> internacaoService.transferir(internacao.getId(), UUID.randomUUID(), LOGIN_ADMINISTRATIVO))
 				.isInstanceOf(RegraNegocioException.class);
@@ -237,7 +266,7 @@ class InternacaoServiceTest {
 	void transferenciaExigeVinculoComAInstituicaoOndeOPacienteEstaInternado() {
 		Internacao internacao = novaInternacao();
 		UUID instituicaoAtual = UUID.randomUUID();
-		when(internacaoRepository.findById(internacao.getId())).thenReturn(Optional.of(internacao));
+		when(internacaoRepository.findComBloqueioById(internacao.getId())).thenReturn(Optional.of(internacao));
 		when(ocupacaoLeitoRepository.instituicaoDaOcupacaoAtual(internacao.getId())).thenReturn(Optional.of(instituicaoAtual));
 		doThrow(new AccessDeniedException("sem vínculo")).when(vinculoService)
 				.exigirVinculoAtivo(LOGIN_ADMINISTRATIVO, instituicaoAtual, Perfil.ADMINISTRATIVO);

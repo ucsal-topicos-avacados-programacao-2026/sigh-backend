@@ -1,5 +1,16 @@
 package com.sigh.sigh.project.leito.service;
 
+import com.sigh.sigh.project.instituicao.entity.Instituicao;
+import com.sigh.sigh.project.instituicao.repository.InstituicaoRepository;
+import com.sigh.sigh.project.leito.dto.ReferenciasDaSolicitacao;
+import com.sigh.sigh.project.leito.dto.SolicitacaoTransferenciaRequestDTO;
+import com.sigh.sigh.project.leito.dto.SolicitacaoTransferenciaResponseDTO;
+import com.sigh.sigh.project.leito.entity.SolicitacaoTransferencia;
+import com.sigh.sigh.project.leito.entity.StatusSolicitacaoTransferencia;
+import com.sigh.sigh.project.leito.repository.SolicitacaoTransferenciaRepository;
+import com.sigh.sigh.project.usuario.service.UsuarioService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import com.sigh.sigh.project.comum.erro.RecursoNaoEncontradoException;
 import com.sigh.sigh.project.comum.erro.RegraNegocioException;
 import com.sigh.sigh.project.leito.dto.InternacaoRequestDTO;
@@ -38,6 +49,9 @@ public class InternacaoService {
 	private final RegistroClinicoRepository registroClinicoRepository;
 	private final Clock clock;
 	private final VinculoService vinculoService;
+	private final SolicitacaoTransferenciaRepository solicitacaoRepository;
+	private final InstituicaoRepository instituicaoRepository;
+	private final UsuarioService usuarioService;
 
 	@Transactional
 	public InternacaoResponseDTO internar(InternacaoRequestDTO dados, String login) {
@@ -60,10 +74,18 @@ public class InternacaoService {
 		return InternacaoResponseDTO.de(internacao, leito);
 	}
 
+	/**
+	 * Transferência entre leitos da mesma instituição: registro direto do administrativo dela. Para outra
+	 * instituição da rede, é por solicitação, que o destino aceita ou recusa (BE-21).
+	 */
 	@Transactional
 	public InternacaoResponseDTO transferir(UUID internacaoId, UUID leitoDestinoId, String login) {
 		Internacao internacao = buscarInternacaoAberta(internacaoId, login);
 		Leito destino = buscarLeitoLivre(leitoDestinoId);
+		if (!destino.getInstituicao().getId().equals(instituicaoAtual(internacao))) {
+			throw new RegraNegocioException("O leito é de outra instituição: a transferência entre instituições é"
+					+ " por solicitação, que o destino aceita ou recusa.");
+		}
 		desocuparLeitoAtual(internacao);
 		ocupar(destino, internacao, MotivoOcupacao.TRANSFERENCIA);
 		return InternacaoResponseDTO.de(internacao, destino);
@@ -76,20 +98,152 @@ public class InternacaoService {
 		Leito leito = desocuparLeitoAtual(internacao);
 		internacao.setAltaEm(LocalDateTime.now(clock));
 		internacao.setResumoAlta(resumoAlta);
+		// Com a alta, um pedido de transferência pendente perde o sentido.
+		for (SolicitacaoTransferencia pendente : solicitacaoRepository.findByInternacaoIdAndStatus(internacao.getId(),
+				StatusSolicitacaoTransferencia.PENDENTE)) {
+			decidir(pendente, StatusSolicitacaoTransferencia.CANCELADA, login);
+		}
 		return InternacaoResponseDTO.de(internacao, leito);
+	}
+
+	/**
+	 * A origem pede a transferência para outra instituição da rede (Processo 2 da ERS: "solicita-se
+	 * transferência para outra unidade da rede"). O paciente continua no leito atual até o destino aceitar.
+	 */
+	@Transactional
+	public SolicitacaoTransferenciaResponseDTO solicitarTransferencia(UUID internacaoId,
+			SolicitacaoTransferenciaRequestDTO dados, String login) {
+		Internacao internacao = buscarInternacaoAberta(internacaoId, login);
+		UUID origem = instituicaoAtual(internacao);
+		if (dados.instituicaoDestinoId().equals(origem)) {
+			throw new RegraNegocioException("Para outro leito da mesma instituição, use a transferência direta.");
+		}
+		Instituicao destino = instituicaoRepository.findById(dados.instituicaoDestinoId())
+				.orElseThrow(() -> new RecursoNaoEncontradoException("Instituição de destino não encontrada."));
+		if (!destino.isCredenciada()) {
+			throw new RegraNegocioException("A instituição de destino não está credenciada na rede.");
+		}
+		if (!solicitacaoRepository.findByInternacaoIdAndStatus(internacaoId, StatusSolicitacaoTransferencia.PENDENTE)
+				.isEmpty()) {
+			throw new RegraNegocioException("Já há uma solicitação de transferência pendente para esta internação.");
+		}
+		SolicitacaoTransferencia solicitacao = new SolicitacaoTransferencia();
+		solicitacao.setInternacao(internacao);
+		solicitacao.setInstituicaoOrigem(instituicaoRepository.getReferenceById(origem));
+		solicitacao.setInstituicaoDestino(destino);
+		solicitacao.setCategoria(dados.categoria());
+		solicitacao.setStatus(StatusSolicitacaoTransferencia.PENDENTE);
+		solicitacao.setSolicitadaEm(LocalDateTime.now(clock));
+		solicitacao.setSolicitante(usuarioService.buscarPorLogin(login));
+		return SolicitacaoTransferenciaResponseDTO.de(solicitacaoRepository.saveAndFlush(solicitacao));
+	}
+
+	/** Pendentes para o destino, do mais antigo para o mais novo. Só o administrativo do destino as vê. */
+	@Transactional(readOnly = true)
+	public Page<SolicitacaoTransferenciaResponseDTO> solicitacoesRecebidas(UUID instituicaoId, String login,
+			Pageable paginacao) {
+		vinculoService.exigirVinculoAtivo(login, instituicaoId, Perfil.ADMINISTRATIVO);
+		return solicitacaoRepository.buscarPendentesParaODestino(instituicaoId, paginacao)
+				.map(SolicitacaoTransferenciaResponseDTO::de);
+	}
+
+	/** Pedidos feitos pela origem, com o status e o motivo da recusa. Só o administrativo da origem os vê. */
+	@Transactional(readOnly = true)
+	public Page<SolicitacaoTransferenciaResponseDTO> solicitacoesEnviadas(UUID instituicaoId, String login,
+			Pageable paginacao) {
+		vinculoService.exigirVinculoAtivo(login, instituicaoId, Perfil.ADMINISTRATIVO);
+		return solicitacaoRepository.buscarEnviadasPelaOrigem(instituicaoId, paginacao)
+				.map(SolicitacaoTransferenciaResponseDTO::de);
+	}
+
+	/**
+	 * O destino aceita escolhendo um leito livre dele, da categoria pedida ("a unidade de destino executa
+	 * este mesmo processo"). O paciente deixa o leito da origem, que vai para higienização.
+	 */
+	@Transactional
+	public SolicitacaoTransferenciaResponseDTO aceitarTransferencia(UUID solicitacaoId, UUID leitoId, String login) {
+		SolicitacaoTransferencia solicitacao = travarPendente(solicitacaoId, login, true);
+		if (!solicitacao.getInstituicaoDestino().isCredenciada()) {
+			throw new RegraNegocioException("A instituição de destino não está mais credenciada na rede.");
+		}
+		Internacao internacao = solicitacao.getInternacao();
+		if (internacao.getAltaEm() != null
+				|| !solicitacao.getInstituicaoOrigem().getId().equals(instituicaoAtual(internacao))) {
+			throw new RegraNegocioException("O paciente não está mais internado na instituição que pediu a transferência.");
+		}
+		Leito leito = buscarLeitoLivre(leitoId);
+		if (!leito.getInstituicao().getId().equals(solicitacao.getInstituicaoDestino().getId())) {
+			throw new RegraNegocioException("O leito precisa ser da instituição de destino.");
+		}
+		if (leito.getCategoria() != solicitacao.getCategoria()) {
+			throw new RegraNegocioException("O leito precisa ser da categoria pedida (" + solicitacao.getCategoria() + ").");
+		}
+		desocuparLeitoAtual(internacao);
+		ocupar(leito, internacao, MotivoOcupacao.TRANSFERENCIA);
+		solicitacao.setLeitoDestino(leito);
+		decidir(solicitacao, StatusSolicitacaoTransferencia.ACEITA, login);
+		return SolicitacaoTransferenciaResponseDTO.de(solicitacao);
+	}
+
+	@Transactional
+	public SolicitacaoTransferenciaResponseDTO recusarTransferencia(UUID solicitacaoId, String motivo, String login) {
+		SolicitacaoTransferencia solicitacao = travarPendente(solicitacaoId, login, true);
+		solicitacao.setMotivoRecusa(motivo.strip());
+		decidir(solicitacao, StatusSolicitacaoTransferencia.RECUSADA, login);
+		return SolicitacaoTransferenciaResponseDTO.de(solicitacao);
+	}
+
+	/** Só a origem cancela, e só enquanto estiver pendente. */
+	@Transactional
+	public SolicitacaoTransferenciaResponseDTO cancelarTransferencia(UUID solicitacaoId, String login) {
+		SolicitacaoTransferencia solicitacao = travarPendente(solicitacaoId, login, false);
+		decidir(solicitacao, StatusSolicitacaoTransferencia.CANCELADA, login);
+		return SolicitacaoTransferenciaResponseDTO.de(solicitacao);
+	}
+
+	/**
+	 * Confere o vínculo (com o destino ou com a origem) antes de travar qualquer coisa; depois trava a
+	 * internação e a solicitação, nessa ordem (a mesma da alta e da transferência direta), e confere que
+	 * ainda está pendente.
+	 */
+	private SolicitacaoTransferencia travarPendente(UUID solicitacaoId, String login, boolean peloDestino) {
+		ReferenciasDaSolicitacao referencias = solicitacaoRepository.buscarReferencias(solicitacaoId)
+				.orElseThrow(() -> new RecursoNaoEncontradoException("Solicitação de transferência não encontrada."));
+		vinculoService.exigirVinculoAtivo(login,
+				peloDestino ? referencias.instituicaoDestinoId() : referencias.instituicaoOrigemId(), Perfil.ADMINISTRATIVO);
+		internacaoRepository.findComBloqueioById(referencias.internacaoId());
+		SolicitacaoTransferencia solicitacao = solicitacaoRepository.findComBloqueioById(solicitacaoId).orElseThrow();
+		exigirPendente(solicitacao);
+		return solicitacao;
+	}
+
+	private static void exigirPendente(SolicitacaoTransferencia solicitacao) {
+		if (solicitacao.getStatus() != StatusSolicitacaoTransferencia.PENDENTE) {
+			throw new RegraNegocioException("A solicitação de transferência já foi decidida.");
+		}
+	}
+
+	private void decidir(SolicitacaoTransferencia solicitacao, StatusSolicitacaoTransferencia status, String login) {
+		solicitacao.setStatus(status);
+		solicitacao.setDecididaEm(LocalDateTime.now(clock));
+		solicitacao.setDecisor(usuarioService.buscarPorLogin(login));
 	}
 
 	/** Transferência e alta exigem vínculo com a instituição onde o paciente está internado agora. */
 	private Internacao buscarInternacaoAberta(UUID internacaoId, String login) {
-		Internacao internacao = internacaoRepository.findById(internacaoId)
+		Internacao internacao = internacaoRepository.findComBloqueioById(internacaoId)
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Internação não encontrada."));
-		UUID instituicaoAtual = ocupacaoLeitoRepository.instituicaoDaOcupacaoAtual(internacao.getId())
-				.orElseGet(() -> internacao.getAtendimentoOrigem().getInstituicao().getId());
-		vinculoService.exigirVinculoAtivo(login, instituicaoAtual, Perfil.ADMINISTRATIVO);
+		vinculoService.exigirVinculoAtivo(login, instituicaoAtual(internacao), Perfil.ADMINISTRATIVO);
 		if (internacao.getAltaEm() != null) {
 			throw new RegraNegocioException("A internação já foi encerrada.");
 		}
 		return internacao;
+	}
+
+	/** Instituição onde o paciente está internado agora: a do leito ocupado (ou a do atendimento de origem). */
+	private UUID instituicaoAtual(Internacao internacao) {
+		return ocupacaoLeitoRepository.instituicaoDaOcupacaoAtual(internacao.getId())
+				.orElseGet(() -> internacao.getAtendimentoOrigem().getInstituicao().getId());
 	}
 
 	private Leito buscarLeitoLivre(UUID leitoId) {

@@ -102,7 +102,7 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 	/** Dados de um hospital, com tudo o que as rotas usam. */
 	private record Dados(Instituicao hospital, String cpf, UUID pacienteId, UUID atendimentoId, UUID triagemId,
 			UUID resumoId, UUID atendimentoSemTriagemId, UUID leitoId, UUID leitoLivreId, UUID internacaoId,
-			UUID representacaoId) {
+			UUID representacaoId, Instituicao outraInstituicao, UUID solicitacaoEnviadaId, UUID solicitacaoRecebidaId) {
 	}
 
 	/** A requisição de cada rota, montada sobre os dados do hospital. */
@@ -136,6 +136,21 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 						.content("{\"leitoDestinoId\":\"%s\"}".formatted(d.leitoLivreId())));
 		casos.put("POST /internacoes/{internacaoId}/alta", d -> post("/internacoes/{id}/alta", d.internacaoId())
 				.content("{\"resumoAltaId\":\"%s\"}".formatted(UUID.randomUUID())));
+		casos.put("POST /internacoes/{internacaoId}/solicitacoes-transferencia",
+				d -> post("/internacoes/{id}/solicitacoes-transferencia", d.internacaoId()).content(
+						"{\"instituicaoDestinoId\":\"%s\",\"categoria\":\"ENFERMARIA\"}".formatted(d.outraInstituicao().getId())));
+		casos.put("GET /solicitacoes-transferencia/recebidas", d -> get("/solicitacoes-transferencia/recebidas")
+				.param("instituicaoId", d.hospital().getId().toString()));
+		casos.put("GET /solicitacoes-transferencia/enviadas", d -> get("/solicitacoes-transferencia/enviadas")
+				.param("instituicaoId", d.hospital().getId().toString()));
+		casos.put("POST /solicitacoes-transferencia/{solicitacaoId}/aceite",
+				d -> post("/solicitacoes-transferencia/{id}/aceite", d.solicitacaoRecebidaId())
+						.content("{\"leitoId\":\"%s\"}".formatted(d.leitoLivreId())));
+		casos.put("POST /solicitacoes-transferencia/{solicitacaoId}/recusa",
+				d -> post("/solicitacoes-transferencia/{id}/recusa", d.solicitacaoRecebidaId())
+						.content("{\"motivo\":\"Sem vaga na equipe\"}"));
+		casos.put("POST /solicitacoes-transferencia/{solicitacaoId}/cancelamento",
+				d -> post("/solicitacoes-transferencia/{id}/cancelamento", d.solicitacaoEnviadaId()));
 		casos.put("POST /api/pacientes/busca", d -> post("/api/pacientes/busca")
 				.content("{\"cpf\":\"%s\",\"instituicaoId\":\"%s\"}".formatted(d.cpf(), d.hospital().getId())));
 		casos.put("POST /api/pacientes/admissoes", d -> post("/api/pacientes/admissoes").content("""
@@ -216,7 +231,10 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 		return resultado.getResponse().getStatus();
 	}
 
-	/** Um hospital com paciente atendido, triagem, resumo, leitos, internação e representação legal. */
+	/**
+	 * Um hospital com paciente atendido, triagem, resumo, leitos, internação, representação legal e pedidos
+	 * de transferência de e para outra instituição.
+	 */
 	private Dados montarHospital() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
 		String administrativo = cenario.administrativo(hospital);
@@ -241,8 +259,20 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 		cenario.representante(pacienteId, LocalDateTime.now(relogio).minusDays(1), null);
 		UUID representacaoId = jdbc.queryForObject("select id from representacao_legal where paciente_id = ?", UUID.class,
 				pacienteId);
+		// Transferência entre instituições: um pedido deste hospital para outro, e um de outro para este.
+		Instituicao outra = cenario.instituicao(true);
+		String administrativoDaOutra = cenario.administrativo(outra);
+		UUID internacaoNaOutra = id(executar(administrativoDaOutra, "ADMINISTRATIVO", post("/internacoes").content(
+				"{\"atendimentoId\":\"%s\",\"leitoId\":\"%s\"}".formatted(segundaAdmissao(administrativoDaOutra, outra),
+						leito(administrativoDaOutra, outra)))), "$.id");
+		UUID recebida = id(executar(administrativoDaOutra, "ADMINISTRATIVO", post("/internacoes/{id}/solicitacoes-transferencia",
+				internacaoNaOutra).content("{\"instituicaoDestinoId\":\"%s\",\"categoria\":\"ENFERMARIA\"}"
+				.formatted(hospital.getId()))), "$.id");
+		UUID enviada = id(executar(administrativo, "ADMINISTRATIVO", post("/internacoes/{id}/solicitacoes-transferencia",
+				internacaoId).content("{\"instituicaoDestinoId\":\"%s\",\"categoria\":\"ENFERMARIA\"}"
+				.formatted(outra.getId()))), "$.id");
 		return new Dados(hospital, cpf, pacienteId, atendimentoId, triagemId, resumoId, atendimentoSemTriagem, leito,
-				leitoLivre, internacaoId, representacaoId);
+				leitoLivre, internacaoId, representacaoId, outra, enviada, recebida);
 	}
 
 	private UUID segundaAdmissao(String administrativo, Instituicao hospital) throws Exception {
