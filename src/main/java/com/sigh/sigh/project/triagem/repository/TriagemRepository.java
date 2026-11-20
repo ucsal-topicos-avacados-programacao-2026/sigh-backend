@@ -6,9 +6,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.util.Optional;
 import java.util.UUID;
 
 public interface TriagemRepository extends JpaRepository<Triagem, UUID> {
+
+	/** A classificação de risco confirmada mais recente do atendimento (empate no horário: decide o id). */
+	Optional<Triagem> findFirstByAtendimentoIdAndCorConfirmadaIsNotNullOrderByConfirmadaEmDescIdDesc(UUID atendimentoId);
 
 	@Query(value = """
 			select t from Triagem t

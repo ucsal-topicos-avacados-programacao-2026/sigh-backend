@@ -113,6 +113,10 @@ class CriptografiaEmRepousoTest extends TesteIntegracao {
 				.andExpect(jsonPath("$.sinaisVitais.temperatura").value(37.8))
 				.andReturn().getResponse().getContentAsString();
 		UUID triagemId = UUID.fromString(JsonPath.read(triagem, "$.id"));
+		// Classificação vermelha: o acesso de emergência mais abaixo só vale com risco imediato (BE-18).
+		mvc.perform(post("/triagens/{id}/confirmacao", triagemId).with(user(enfermeiro).roles("ENFERMEIRO")).with(csrf())
+						.contentType(MediaType.APPLICATION_JSON).content("{\"cor\":\"VERMELHO\"}"))
+				.andExpect(status().isOk());
 		// O médico registra depois da triagem: com o atendimento em curso, não se tria mais.
 		mvc.perform(post("/atendimentos/{id}/registros", atendimentoId).with(user(medico).roles("MEDICO")).with(csrf())
 						.contentType(MediaType.APPLICATION_JSON)
