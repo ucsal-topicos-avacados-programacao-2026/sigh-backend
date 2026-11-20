@@ -3,11 +3,8 @@ package com.sigh.sigh.project.prontuario.service;
 import com.sigh.sigh.project.auditoria.dto.AcessoProntuarioDTO;
 import com.sigh.sigh.project.auditoria.service.RegistroAuditoriaService;
 import com.sigh.sigh.project.instituicao.entity.Instituicao;
-import com.sigh.sigh.project.paciente.entity.Consentimento;
-import com.sigh.sigh.project.paciente.entity.DecisaoConsentimento;
 import com.sigh.sigh.project.paciente.entity.Paciente;
-import com.sigh.sigh.project.paciente.entity.TipoConsentimento;
-import com.sigh.sigh.project.paciente.repository.ConsentimentoRepository;
+import com.sigh.sigh.project.paciente.service.ConsentimentoService;
 import com.sigh.sigh.project.prontuario.dto.ConsultaHistoricoDTO;
 import com.sigh.sigh.project.prontuario.entity.Atendimento;
 import com.sigh.sigh.project.prontuario.entity.Prontuario;
@@ -23,7 +20,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Limit;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,7 +37,7 @@ class HistoricoAutorizadoServiceTest {
 			new ConsultaHistoricoDTO("medico.teste", Perfil.MEDICO, "Resumo do histórico por IA", LIMITE_DE_REGISTROS);
 
 	@Mock
-	private ConsentimentoRepository consentimentoRepository;
+	private ConsentimentoService consentimentoService;
 
 	@Mock
 	private RegistroClinicoRepository registroClinicoRepository;
@@ -55,7 +51,7 @@ class HistoricoAutorizadoServiceTest {
 
 	@BeforeEach
 	public void prepararAtendimento() {
-		historicoAutorizadoService = new HistoricoAutorizadoService(consentimentoRepository, registroClinicoRepository,
+		historicoAutorizadoService = new HistoricoAutorizadoService(consentimentoService, registroClinicoRepository,
 				registroAuditoriaService);
 		Paciente paciente = new Paciente();
 		paciente.setId(UUID.randomUUID());
@@ -70,30 +66,24 @@ class HistoricoAutorizadoServiceTest {
 		atendimento.setInstituicao(instituicao);
 	}
 
+	/** NEGADO, sem manifestação, revogado sem atendimento anterior na instituição ou instituição não credenciada. */
 	@Test
-	void consentimentoNegadoNaoLiberaHistoricoNemGeraAcesso() {
-		consentimentoMaisRecente(DecisaoConsentimento.NEGADO);
+	void consentimentoQueNaoPermiteCompartilharNaoLiberaHistoricoNemGeraAcesso() {
+		compartilhamentoPermitido(false);
 
 		List<RegistroClinico> historico = historicoAutorizadoService.consultar(atendimento, CONSULTA_DO_MEDICO);
 
 		assertThat(historico).isEmpty();
+		verify(consentimentoService).podeCompartilharCom(pacienteId, atendimento.getInstituicao().getId());
 		verify(registroClinicoRepository, never()).buscarHistoricoSemRestricao(any(), any(), any());
 		verify(registroAuditoriaService, never()).registrarAcesso(any());
 	}
 
 	@Test
-	void pacienteSemConsentimentoRegistradoNaoTemHistoricoCompartilhado() {
-		when(consentimentoRepository.findFirstByPacienteIdAndTipoOrderByVersaoDesc(pacienteId, TipoConsentimento.AMPLO))
-				.thenReturn(Optional.empty());
-
-		assertThat(historicoAutorizadoService.consultar(atendimento, CONSULTA_DO_MEDICO)).isEmpty();
-	}
-
-	@Test
-	void consentimentoAutorizadoTrazHistoricoLimitadoERegistraOAcesso() {
+	void consentimentoQuePermiteCompartilharTrazHistoricoLimitadoERegistraOAcesso() {
 		RegistroClinico registro = new RegistroClinico();
 		registro.setId(UUID.randomUUID());
-		consentimentoMaisRecente(DecisaoConsentimento.AUTORIZADO);
+		compartilhamentoPermitido(true);
 		when(registroClinicoRepository.buscarHistoricoSemRestricao(
 				eq(atendimento.getProntuario().getId()), any(), eq(Limit.of(LIMITE_DE_REGISTROS))))
 				.thenReturn(List.of(registro));
@@ -108,10 +98,8 @@ class HistoricoAutorizadoServiceTest {
 		assertThat(acesso.getValue().registrosAcessadosIds()).containsExactly(registro.getId());
 	}
 
-	private void consentimentoMaisRecente(DecisaoConsentimento decisao) {
-		Consentimento consentimento = new Consentimento();
-		consentimento.setDecisao(decisao);
-		when(consentimentoRepository.findFirstByPacienteIdAndTipoOrderByVersaoDesc(pacienteId, TipoConsentimento.AMPLO))
-				.thenReturn(Optional.of(consentimento));
+	private void compartilhamentoPermitido(boolean permitido) {
+		when(consentimentoService.podeCompartilharCom(pacienteId, atendimento.getInstituicao().getId()))
+				.thenReturn(permitido);
 	}
 }
