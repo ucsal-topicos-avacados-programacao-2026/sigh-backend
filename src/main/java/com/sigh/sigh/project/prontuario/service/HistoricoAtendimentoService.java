@@ -1,5 +1,7 @@
 package com.sigh.sigh.project.prontuario.service;
 
+import com.sigh.sigh.project.auditoria.dto.AcessoProntuarioDTO;
+import com.sigh.sigh.project.auditoria.service.RegistroAuditoriaService;
 import com.sigh.sigh.project.comum.erro.DadosInvalidosException;
 import com.sigh.sigh.project.comum.erro.RecursoNaoEncontradoException;
 import com.sigh.sigh.project.comum.erro.RegraNegocioException;
@@ -33,6 +35,7 @@ public class HistoricoAtendimentoService {
 
 	static final String FINALIDADE_CONSULTA = "Consulta do histórico no atendimento";
 	static final String FINALIDADE_EMERGENCIA = "Acesso de emergência";
+	static final String FINALIDADE_TENTATIVA_RECUSADA = "Tentativa de acesso de emergência recusada";
 	static final int JUSTIFICATIVA_MINIMA = 20;
 	/** Só o risco imediato justifica furar a restrição do paciente (BE-18). */
 	static final Set<CorRisco> GRAVES = Set.of(CorRisco.VERMELHO, CorRisco.LARANJA);
@@ -41,19 +44,21 @@ public class HistoricoAtendimentoService {
 	private final HistoricoAutorizadoService historicoAutorizadoService;
 	private final VinculoService vinculoService;
 	private final TriagemRepository triagemRepository;
+	private final RegistroAuditoriaService registroAuditoriaService;
 	private final Clock clock;
 	private final int limiteDeRegistros;
 	private final Duration janelaDeEmergencia;
 
 	public HistoricoAtendimentoService(AtendimentoRepository atendimentoRepository,
 			HistoricoAutorizadoService historicoAutorizadoService, VinculoService vinculoService,
-			TriagemRepository triagemRepository, Clock clock,
+			TriagemRepository triagemRepository, RegistroAuditoriaService registroAuditoriaService, Clock clock,
 			@Value("${sigh.historico.limite-registros}") int limiteDeRegistros,
 			@Value("${sigh.emergencia.janela}") Duration janelaDeEmergencia) {
 		this.atendimentoRepository = atendimentoRepository;
 		this.historicoAutorizadoService = historicoAutorizadoService;
 		this.vinculoService = vinculoService;
 		this.triagemRepository = triagemRepository;
+		this.registroAuditoriaService = registroAuditoriaService;
 		this.clock = clock;
 		this.limiteDeRegistros = limiteDeRegistros;
 		this.janelaDeEmergencia = janelaDeEmergencia;
@@ -76,6 +81,9 @@ public class HistoricoAtendimentoService {
 	 * <p>Controles contra abuso (BE-18): a classificação de risco confirmada mais recente do atendimento
 	 * precisa ser vermelha ou laranja, e o acesso só vale até {@code sigh.emergencia.janela} (12 h) depois
 	 * dela. Todo acesso entra na fila do auditor ({@code GET /auditoria/emergencias/pendentes}).
+	 *
+	 * <p>BE-24: quem confirmou a classificação não usa a emergência com base nela (precisa de outra
+	 * pessoa), e a tentativa recusada por essas regras fica na auditoria, para o auditor ver.
 	 */
 	@Transactional
 	public HistoricoDoAtendimentoDTO acessarEmEmergencia(UUID atendimentoId, String justificativa, String login) {
@@ -87,8 +95,13 @@ public class HistoricoAtendimentoService {
 		if (!atendimento.getInstituicao().isCredenciada()) {
 			throw new RegraNegocioException("A instituição não está credenciada na rede.");
 		}
-		exigirRiscoImediato(atendimento);
 		String texto = justificativa.strip();
+		try {
+			exigirRiscoImediato(atendimento, login);
+		} catch (EmergenciaRecusadaException recusa) {
+			registrarTentativa(atendimento, login, perfil, texto, recusa);
+			throw recusa;
+		}
 		if (texto.length() < JUSTIFICATIVA_MINIMA) {
 			throw new DadosInvalidosException(Map.of("justificativa", "descreva a emergência com 20 a 2000 caracteres"));
 		}
@@ -98,15 +111,42 @@ public class HistoricoAtendimentoService {
 				paraDTO(registros, historicoAutorizadoService.restritos(atendimento.getProntuario())), false, true);
 	}
 
-	private void exigirRiscoImediato(Atendimento atendimento) {
+	/**
+	 * A tentativa recusada vai para a auditoria numa transação própria. Se a gravação falhar, a resposta
+	 * continua sendo a recusa (o acesso segue negado), com a falha anexada a ela.
+	 */
+	private void registrarTentativa(Atendimento atendimento, String login, Perfil perfil, String justificativa,
+			EmergenciaRecusadaException recusa) {
+		try {
+			registroAuditoriaService.registrarTentativaRecusada(new AcessoProntuarioDTO(
+					atendimento.getProntuario().getId(), login, perfil, atendimento.getInstituicao().getId(),
+					FINALIDADE_TENTATIVA_RECUSADA + ": " + recusa.motivo().descricao(), false,
+					justificativa.isEmpty() ? null : justificativa, Set.of()));
+		} catch (RuntimeException falha) {
+			recusa.addSuppressed(falha);
+		}
+	}
+
+	/**
+	 * Risco imediato: a classificação confirmada mais recente é vermelha ou laranja, com quem a confirmou
+	 * identificado (sem isso, recusa), e não foi o próprio solicitante; e ainda está dentro da janela.
+	 */
+	private void exigirRiscoImediato(Atendimento atendimento, String login) {
 		Triagem classificacao = triagemRepository
 				.findFirstByAtendimentoIdAndCorConfirmadaIsNotNullOrderByConfirmadaEmDescIdDesc(atendimento.getId())
-				.filter(triagem -> GRAVES.contains(triagem.getCorConfirmada()))
-				.orElseThrow(() -> new RegraNegocioException("Acesso de emergência só vale para atendimento com"
-						+ " classificação de risco vermelha ou laranja confirmada."));
+				.filter(triagem -> GRAVES.contains(triagem.getCorConfirmada()) && triagem.getConfirmador() != null)
+				.orElseThrow(() -> new EmergenciaRecusadaException(EmergenciaRecusadaException.Motivo.SEM_RISCO_IMEDIATO,
+						"Acesso de emergência só vale para atendimento com classificação de risco vermelha ou laranja"
+								+ " confirmada."));
+		if (login.equals(classificacao.getConfirmador().getLogin())) {
+			throw new EmergenciaRecusadaException(EmergenciaRecusadaException.Motivo.QUEM_CLASSIFICOU,
+					"Quem confirmou a classificação de risco não pode usar o acesso de emergência com base nela:"
+							+ " outro profissional precisa fazê-lo.");
+		}
 		if (LocalDateTime.now(clock).isAfter(classificacao.getConfirmadaEm().plus(janelaDeEmergencia))) {
-			throw new RegraNegocioException("O acesso de emergência só vale até " + duracao(janelaDeEmergencia)
-					+ " depois da classificação vermelha ou laranja.");
+			throw new EmergenciaRecusadaException(EmergenciaRecusadaException.Motivo.FORA_DA_JANELA,
+					"O acesso de emergência só vale até " + duracao(janelaDeEmergencia)
+							+ " depois da classificação vermelha ou laranja.");
 		}
 	}
 
