@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -33,6 +34,7 @@ public class InternacaoService {
 	private final LeitoRepository leitoRepository;
 	private final AtendimentoRepository atendimentoRepository;
 	private final RegistroClinicoRepository registroClinicoRepository;
+	private final Clock clock;
 
 	@Transactional
 	public InternacaoResponseDTO internar(InternacaoRequestDTO dados) {
@@ -45,7 +47,7 @@ public class InternacaoService {
 		Internacao internacao = new Internacao();
 		internacao.setProntuario(atendimento.getProntuario());
 		internacao.setAtendimentoOrigem(atendimento);
-		internacao.setAdmitidaEm(LocalDateTime.now());
+		internacao.setAdmitidaEm(LocalDateTime.now(clock));
 		internacaoRepository.save(internacao);
 		ocupar(leito, internacao, MotivoOcupacao.INTERNACAO);
 		return InternacaoResponseDTO.de(internacao, leito);
@@ -65,7 +67,7 @@ public class InternacaoService {
 		Internacao internacao = buscarInternacaoAberta(internacaoId);
 		RegistroClinico resumoAlta = buscarResumoAlta(resumoAltaId, internacao);
 		Leito leito = desocuparLeitoAtual(internacao);
-		internacao.setAltaEm(LocalDateTime.now());
+		internacao.setAltaEm(LocalDateTime.now(clock));
 		internacao.setResumoAlta(resumoAlta);
 		return InternacaoResponseDTO.de(internacao, leito);
 	}
@@ -104,7 +106,7 @@ public class InternacaoService {
 		OcupacaoLeito ocupacao = new OcupacaoLeito();
 		ocupacao.setLeito(leito);
 		ocupacao.setInternacao(internacao);
-		ocupacao.setInicioEm(LocalDateTime.now());
+		ocupacao.setInicioEm(LocalDateTime.now(clock));
 		ocupacao.setMotivoInicio(motivo);
 		ocupacaoLeitoRepository.save(ocupacao);
 		leito.setStatus(StatusLeito.OCUPADO);
@@ -113,7 +115,7 @@ public class InternacaoService {
 	private Leito desocuparLeitoAtual(Internacao internacao) {
 		OcupacaoLeito ocupacao = ocupacaoLeitoRepository.buscarOcupacaoAtual(internacao.getId())
 				.orElseThrow(() -> new RegraNegocioException("A internação não tem leito ocupado."));
-		ocupacao.setFimEm(LocalDateTime.now());
+		ocupacao.setFimEm(LocalDateTime.now(clock));
 		Leito leito = ocupacao.getLeito();
 		leito.setStatus(StatusLeito.EM_HIGIENIZACAO);
 		return leito;

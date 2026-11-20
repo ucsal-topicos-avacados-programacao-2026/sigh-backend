@@ -1,5 +1,10 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- now() segue o fuso da sessão, que o driver JDBC herda da JVM. Fixar o fuso da aplicação
+-- (sigh.fuso-horario) faz os horários de demonstração baterem com o relógio do back-end.
+-- SET LOCAL vale só para esta migração.
+SET LOCAL TIME ZONE '${fuso_horario}';
+
 INSERT INTO instituicao (id, nome, tipo, credenciada) VALUES
     ('10000000-0000-0000-0000-000000000001', 'Hospital Público Exemplo', 'PUBLICA', TRUE),
     ('10000000-0000-0000-0000-000000000002', 'Hospital Privado Exemplo', 'PRIVADA', TRUE);

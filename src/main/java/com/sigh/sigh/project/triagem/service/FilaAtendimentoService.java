@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -21,10 +22,11 @@ public class FilaAtendimentoService {
 
 	private final TriagemRepository triagemRepository;
 	private final TempoMaximoEsperaProperties tempoMaximoEspera;
+	private final Clock clock;
 
 	@Transactional(readOnly = true)
 	public Page<PacienteNaFilaDTO> consultarFila(UUID instituicaoId, Pageable paginacao) {
-		LocalDateTime agora = LocalDateTime.now();
+		LocalDateTime agora = LocalDateTime.now(clock);
 		return triagemRepository.buscarFila(instituicaoId, paginacao)
 				.map(triagem -> paraPacienteNaFila(triagem, agora));
 	}
