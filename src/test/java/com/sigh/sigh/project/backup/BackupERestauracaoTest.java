@@ -1,7 +1,11 @@
 package com.sigh.sigh.project.backup;
 
+import com.github.dockerjava.api.model.Bind;
+import com.github.dockerjava.api.model.Volume;
 import com.sigh.sigh.project.comum.cripto.CifraDeDadosClinicos;
-import com.sigh.sigh.project.comum.cripto.CifragemDeDadosLegados;
+import com.sigh.sigh.project.comum.cripto.ManutencaoDaCifragem;
+import com.sigh.sigh.project.support.BancoDoSigh;
+import com.sigh.sigh.project.support.CertificadoDeTeste;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -10,13 +14,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
-import org.testcontainers.images.builder.ImageFromDockerfile;
-import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.MountableFile;
 
-import java.nio.file.Path;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Base64;
@@ -25,10 +29,12 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Critérios de aceite do BE-09 (RNF-004, RNF-007): backup completo e incrementais cifrados, com cópia
- * fora do servidor; a restauração com dados fictícios confere com a origem; o dado clínico não aparece
- * em texto claro nas cópias nem nos arquivos restaurados. Usa a mesma imagem e os mesmos scripts de
- * produção.
+ * Critérios de aceite do BE-09 e do BE-22 (RNF-004, RNF-007): backup completo e incrementais cifrados,
+ * com cópia fora do servidor, e segmentos de WAL arquivados cifrados; a restauração com dados fictícios
+ * confere com a origem, inclusive o que mudou depois do último backup; o dado clínico não aparece em
+ * texto claro nas cópias, no WAL arquivado nem nos arquivos restaurados; o banco só aceita TLS; uma
+ * falha do backup ou do arquivamento acende o alerta. Usa a mesma imagem e os mesmos scripts de
+ * produção, para o banco e para o executor do backup.
  */
 class BackupERestauracaoTest {
 
@@ -38,33 +44,33 @@ class BackupERestauracaoTest {
 	private static final String[] TABELAS = {"instituicao", "usuario", "paciente", "prontuario", "registro_clinico"};
 	private static final CifraDeDadosClinicos CIFRA = new CifraDeDadosClinicos(
 			Base64.getEncoder().encodeToString("chave-ficticia-dos-dados-32bytes".getBytes()), "1", "");
+	private static final String VOLUME_WAL = "sigh-wal-teste-" + UUID.randomUUID();
 
 	private static Network rede;
-	private static PostgreSQLContainer banco;
+	private static CertificadoDeTeste certificado;
+	private static GenericContainer<?> banco;
 	private static GenericContainer<?> executor;
-	private static ImageFromDockerfile imagem;
 	private static JdbcTemplate jdbc;
-	private static CifragemDeDadosLegados cifragemDeLegados;
+	private static ManutencaoDaCifragem manutencao;
 	private static UUID instituicaoId;
 	private static UUID autorId;
 
 	@BeforeAll
 	static void subirBancoEExecutor() throws Exception {
 		rede = Network.newNetwork();
-		banco = new PostgreSQLContainer("postgres:17-alpine")
+		certificado = BancoDoSigh.certificado();
+		banco = BancoDoSigh.comTls(certificado)
 				.withNetwork(rede).withNetworkAliases("banco")
-				.withCommand("postgres", "-c", "summarize_wal=on", "-c", "wal_level=replica");
+				.withEnv("SIGH_WAL_DIR", "/wal").withEnv("SIGH_CHAVE_BACKUP", CHAVE_BACKUP)
+				.withCreateContainerCmdModifier(comando -> comando.getHostConfig()
+						.withBinds(new Bind(VOLUME_WAL, new Volume("/wal"))));
 		banco.start();
-		// Usuário de backup precisa de conexão de replicação (pg_basebackup).
-		banco.execInContainer("sh", "-c",
-				"echo 'host replication all all scram-sha-256' >> /var/lib/postgresql/data/pg_hba.conf");
-		DriverManagerDataSource fonte = new DriverManagerDataSource(banco.getJdbcUrl(), banco.getUsername(),
-				banco.getPassword());
+		DriverManagerDataSource fonte = new DriverManagerDataSource(BancoDoSigh.urlComTls(banco, certificado),
+				BancoDoSigh.USUARIO, BancoDoSigh.SENHA);
 		jdbc = new JdbcTemplate(fonte);
-		jdbc.execute("select pg_reload_conf()");
 		Flyway.configure().dataSource(fonte).locations("classpath:db/migration").load().migrate();
-		cifragemDeLegados = new CifragemDeDadosLegados(jdbc,
-				new TransactionTemplate(new DataSourceTransactionManager(fonte)), CIFRA);
+		manutencao = new ManutencaoDaCifragem(jdbc, new TransactionTemplate(new DataSourceTransactionManager(fonte)),
+				CIFRA, Clock.systemUTC());
 		instituicaoId = UUID.randomUUID();
 		autorId = UUID.randomUUID();
 		jdbc.update("insert into instituicao (id, nome, tipo, credenciada) values (?, 'Hospital Fictício', 'PUBLICA', true)",
@@ -72,9 +78,6 @@ class BackupERestauracaoTest {
 		jdbc.update("insert into usuario (id, login, nome, senha_hash, mfa_habilitado) values (?, 'medico.ficticio',"
 				+ " 'Médico Fictício', 'hash', false)", autorId);
 
-		imagem = new ImageFromDockerfile("sigh-backup-teste", false)
-				.withFileFromPath("Dockerfile", Path.of("docker/backup/Dockerfile"))
-				.withFileFromPath("backup", Path.of("backup"));
 		executor = novoExecutor().withCommand("sleep", "infinity");
 		executor.start();
 	}
@@ -90,19 +93,27 @@ class BackupERestauracaoTest {
 		if (rede != null) {
 			rede.close();
 		}
+		DockerClientFactory.instance().client().removeVolumeCmd(VOLUME_WAL).exec();
 	}
 
 	@Test
-	void cadeiaCompletaMaisIncrementaisRestauraIgualAOrigemSemTextoClaro() throws Exception {
+	void cadeiaCompletaMaisIncrementaisEWalRestauraIgualAOrigemSemTextoClaro() throws Exception {
 		// Dado anterior à criptografia, em claro, cifrado pela mesma rotina que a aplicação roda ao subir.
 		inserirPaciente(1, false);
-		assertThat(cifragemDeLegados.cifrarLegados()).isEqualTo(2);
-		rodar("backup-completo.sh");
+		assertThat(manutencao.executar().cifrados()).isEqualTo(2);
+		arquivarWalAtual();
+		assertThat(walDecifradoContem(MARCADOR_CLINICO)).as("controle: o WAL de antes da migração tem o dado em claro").isTrue();
+		// Depois da migração: completo novo, descartando as cópias e o WAL que têm os valores antigos.
+		rodar("backup-completo.sh --descartar-anteriores");
+		assertThat(walDecifradoContem(MARCADOR_CLINICO)).as("o WAL de antes da migração foi descartado").isFalse();
 		inserirPaciente(2, true);
 		rodar("backup-incremental.sh");
 		inserirPaciente(3, true);
 		jdbc.update("update paciente set nome = 'Paciente Alterado " + MARCADOR_NOME + "' where nome like '%1'");
 		rodar("backup-incremental.sh");
+		// Depois do último backup: só chega à restauração pelo WAL arquivado.
+		inserirPaciente(4, true);
+		String segmento = arquivarWalAtual();
 		String origem = impressaoDigital(null);
 		String cadeia = rodar("basename $(cat /backups/cadeia-atual)").getStdout().strip();
 
@@ -110,6 +121,15 @@ class BackupERestauracaoTest {
 				.contains("000-completo.tar.gz.gpg", "001-incremental.tar.gz.gpg", "002-incremental.tar.gz.gpg")
 				.doesNotContain(".parcial");
 		assertThat(encontra(MARCADOR_NOME, "/backups")).as("cópias cifradas não mostram nem o dado não clínico").isFalse();
+		assertThat(banco.execInContainer("sh", "-c", "LC_ALL=C grep -r -a -l -F '" + MARCADOR_NOME + "' "
+				+ "/var/lib/postgresql/data/pg_wal").getExitCode()).as("controle: o WAL do servidor tem o dado em claro").isZero();
+		// Comprimido, o WAL também esconderia o texto do grep: o controle é decifrá-lo com a chave.
+		assertThat(encontra(MARCADOR_NOME, "/wal")).as("o WAL arquivado não mostra o dado").isFalse();
+		assertThat(executor.execInContainer("gzip", "-t", "/wal/" + segmento + ".gpg").getExitCode())
+				.as("sem a chave, o segmento arquivado nem é um gzip").isNotZero();
+		assertThat(walDecifradoContem(MARCADOR_NOME + " 4")).as("controle: decifrado, o WAL tem o paciente 4").isTrue();
+		assertThat(walDecifradoContem(MARCADOR_CLINICO)).as("nem decifrado o WAL guardado tem o dado clínico").isFalse();
+		assertThat(rodar("ls /externo/wal").getStdout()).as("o WAL arquivado também vai para fora").contains(".gpg");
 		decifrarParte(cadeia, "000-completo", "/conferencia/completo");
 		decifrarParte(cadeia, "001-incremental", "/conferencia/incremental");
 		assertThat(encontra(MARCADOR_NOME, "/conferencia/completo"))
@@ -118,17 +138,15 @@ class BackupERestauracaoTest {
 		assertThat(rodar("find /conferencia/incremental -name 'INCREMENTAL.*' | wc -l").getStdout().strip())
 				.as("a parte 001 é incremental de verdade").isNotEqualTo("0");
 
-		// Recuperação a partir da cópia fora do servidor.
-		rodar("restaurar.sh /externo/" + cadeia + " /restaurado");
-		// O servidor fica em segundo plano; sem soltar a saída do exec, a sessão do Docker não termina.
-		rodar("chown -R postgres:postgres /restaurado && chmod 700 /restaurado"
-				+ " && su postgres -s /bin/sh -c \"pg_ctl -D /restaurado -l /tmp/restaurado.log"
-				+ " -o '-p 5433 -c listen_addresses=127.0.0.1' start\" </dev/null >/dev/null 2>&1");
-		rodar("pg_isready -h 127.0.0.1 -p 5433 -t 60 || (cat /tmp/restaurado.log; exit 1)");
+		// Recuperação a partir da cópia fora do servidor, aplicando o WAL arquivado.
+		rodar("restaurar.sh /externo/" + cadeia + " /restaurado /wal");
+		subirRestaurado("/restaurado", 5433);
 
 		assertThat(impressaoDigital(5433)).isEqualTo(origem);
+		assertThat(psql(5433, "select count(*) from paciente where nome like '%" + MARCADOR_NOME + " 4'"))
+				.as("o paciente gravado depois do último backup voltou pelo WAL").isEqualTo("1");
 		// Grava em disco o que a restauração aplicou do WAL, para a busca olhar os arquivos de verdade.
-		rodar("psql -h 127.0.0.1 -p 5433 -U " + banco.getUsername() + " -d " + banco.getDatabaseName() + " -c CHECKPOINT");
+		psql(5433, "CHECKPOINT");
 		assertThat(encontra(MARCADOR_NOME, "/restaurado/base")).as("controle: a busca acha texto em claro quando ele existe").isTrue();
 		assertThat(encontra(MARCADOR_CLINICO, "/restaurado")).as("nem o dado clínico que era legado em claro").isFalse();
 	}
@@ -170,6 +188,123 @@ class BackupERestauracaoTest {
 		assertThat(processos).contains("pg_basebackup", "gpg").doesNotContain(CHAVE_BACKUP);
 	}
 
+	/**
+	 * Critério de aceite do BE-22: conexão sem TLS com o banco é recusada, pelo próprio banco, inclusive a
+	 * de replicação que o backup usa; e o backup nem tenta sem conferir o certificado do servidor.
+	 */
+	@Test
+	void backupSoConectaAoBancoComTlsVerificado() throws Exception {
+		ExecResult semTls = executor.execInContainer("sh", "-c",
+				"PGSSLMODE=disable pg_basebackup -D /tmp/sem-tls -Fp -X none");
+		assertThat(semTls.getExitCode()).isNotZero();
+		assertThat(semTls.getStderr()).contains("pg_hba.conf rejects", "no encryption");
+
+		ExecResult semVerificar = executor.execInContainer("sh", "-c", "PGSSLMODE=require backup-completo.sh");
+		assertThat(semVerificar.getExitCode()).isNotZero();
+		assertThat(semVerificar.getStderr()).contains("PGSSLMODE=verify-full");
+
+		assertThat(rodar("psql -d " + BancoDoSigh.BANCO + " -Atc \"select ssl from pg_stat_ssl where pid = pg_backend_pid()\"")
+				.getStdout().strip()).isEqualTo("t");
+	}
+
+	/**
+	 * Alerta do backup (RNF-007): o HEALTHCHECK da imagem acusa quando não há backup recente, quando a
+	 * última execução falhou ou foi pulada por outra em andamento.
+	 */
+	@Test
+	void alertaAcusaBackupQueFalhouFoiPuladoOuEstaAtrasado() throws Exception {
+		String pasta = "SIGH_BACKUP_DIR=/backups-alerta SIGH_BACKUP_DESTINO_EXTERNO= SIGH_WAL_DIR= ";
+		ExecResult nenhum = executor.execInContainer("sh", "-c", pasta + "verificar-backup.sh");
+		assertThat(nenhum.getExitCode()).isNotZero();
+		assertThat(nenhum.getStdout()).contains("nenhum backup concluído");
+
+		// Sem nenhum completo ainda, o incremental agendado faz o completo (o alerta não fica aceso até domingo).
+		rodar(pasta + "backup-incremental.sh");
+		assertThat(rodar("ls $(cat /backups-alerta/cadeia-atual)").getStdout()).contains("000-completo.tar.gz.gpg");
+		assertThat(rodar(pasta + "verificar-backup.sh").getStdout()).contains("ok");
+
+		ExecResult falha = executor.execInContainer("sh", "-c", pasta + "PGPASSWORD=senha-errada backup-incremental.sh");
+		assertThat(falha.getExitCode()).isNotZero();
+		ExecResult aposFalha = executor.execInContainer("sh", "-c", pasta + "verificar-backup.sh");
+		assertThat(aposFalha.getExitCode()).isNotZero();
+		assertThat(aposFalha.getStdout()).contains("a última execução falhou (backup incremental saiu com o código");
+
+		rodar("sleep 1; " + pasta + "backup-incremental.sh");
+		assertThat(rodar(pasta + "verificar-backup.sh").getStdout()).contains("ok");
+		// Outra execução segura a trava: o incremental agendado é pulado, e isso também alerta.
+		ExecResult pulado = executor.execInContainer("sh", "-c", "(flock 9; sleep 5) 9>/backups-alerta/.trava & sleep 1; "
+				+ pasta + "backup-incremental.sh; " + pasta + "verificar-backup.sh");
+		assertThat(pulado.getStderr()).contains("outro backup está em andamento");
+		assertThat(pulado.getStdout()).contains("ALERTA", "a última execução falhou");
+
+		rodar("sleep 5; " + pasta + "backup-incremental.sh");
+		rodar("echo '1 backup completo' > /backups-alerta/estado/ultimo-sucesso");
+		ExecResult atrasado = executor.execInContainer("sh", "-c", pasta + "verificar-backup.sh");
+		assertThat(atrasado.getExitCode()).isNotZero();
+		assertThat(atrasado.getStdout()).contains("último backup concluído há mais de 26h");
+
+		assertThat(DockerClientFactory.instance().client().inspectImageCmd(BancoDoSigh.imagem().get()).exec()
+				.getConfig().getHealthcheck().getTest()).contains("/opt/sigh-backup/verificar-backup.sh");
+	}
+
+	/** O mesmo alerta, no servidor do banco, acusa o arquivamento de WAL falhando e para de acusar ao voltar. */
+	@Test
+	void alertaAcusaArquivamentoDeWalFalhando() throws Exception {
+		assertThat(banco.execInContainer("verificar-backup.sh").getStdout()).contains("ok");
+		banco.execInContainer("chmod", "000", "/wal");
+		try {
+			// Sem escrita desde a última troca, pg_switch_wal não fecha segmento nenhum e não haveria o que arquivar.
+			escreverNoWal();
+			jdbc.queryForObject("select pg_walfile_name(pg_switch_wal())", String.class);
+			esperar(() -> banco.execInContainer("verificar-backup.sh").getExitCode() != 0);
+			assertThat(banco.execInContainer("verificar-backup.sh").getStdout()).contains("o arquivamento de WAL está falhando");
+		} finally {
+			banco.execInContainer("chmod", "700", "/wal");
+		}
+		// Ao receber o SIGHUP, o arquivador tenta de novo na hora.
+		jdbc.queryForObject("select pg_reload_conf()", Boolean.class);
+		esperar(() -> banco.execInContainer("verificar-backup.sh").getExitCode() == 0);
+	}
+
+	/**
+	 * Arquivamento e recuperação de um segmento de WAL: uma sobra .parcial não trava; o mesmo segmento
+	 * repetido é aceito, um diferente com o mesmo nome não sobrescreve; na recuperação, segmento ausente é
+	 * o fim do WAL (1) e segmento alterado interrompe a restauração (126).
+	 */
+	@Test
+	void arquivamentoERecuperacaoDeUmSegmentoDeWal() throws Exception {
+		String ambiente = "SIGH_WAL_DIR=/tmp/wal-teste ";
+		String segmento = "0000000100000000000000F9";
+		rodar("rm -rf /tmp/wal-teste && mkdir -p /tmp/wal-teste && head -c 200000 /dev/urandom > /tmp/seg-a"
+				+ " && head -c 200000 /dev/urandom > /tmp/seg-b && echo resto > /tmp/wal-teste/" + segmento + ".gpg.parcial");
+
+		rodar(ambiente + "arquivar-wal.sh /tmp/seg-a " + segmento);
+		assertThat(rodar("ls /tmp/wal-teste").getStdout()).contains(segmento + ".gpg").doesNotContain(".parcial");
+		rodar(ambiente + "arquivar-wal.sh /tmp/seg-a " + segmento);
+		ExecResult outro = executor.execInContainer("sh", "-c", ambiente + "arquivar-wal.sh /tmp/seg-b " + segmento);
+		assertThat(outro.getExitCode()).isNotZero();
+		assertThat(outro.getStderr()).contains("já arquivado com outro conteúdo");
+
+		rodar("recuperar-wal.sh /tmp/wal-teste " + segmento + " /tmp/recuperado && cmp /tmp/recuperado /tmp/seg-a");
+		assertThat(executor.execInContainer("sh", "-c", "recuperar-wal.sh /tmp/wal-teste 0000000100000000000000FA /tmp/x")
+				.getExitCode()).as("segmento ausente: fim do WAL").isEqualTo(1);
+		rodar("printf 'x' | dd of=/tmp/wal-teste/" + segmento + ".gpg bs=1 seek=300 conv=notrunc");
+		ExecResult alterado = executor.execInContainer("sh", "-c", "recuperar-wal.sh /tmp/wal-teste " + segmento + " /tmp/y");
+		assertThat(alterado.getExitCode()).as("segmento alterado: a restauração para").isEqualTo(126);
+		assertThat(alterado.getStderr()).contains("restauração interrompida");
+
+		// Falha da preparação também interrompe, e não vira "fim do WAL" (que perderia o resto em silêncio).
+		ExecResult semChave = executor.execInContainer("sh", "-c",
+				"env -u SIGH_CHAVE_BACKUP recuperar-wal.sh /tmp/wal-teste 0000000100000000000000F9 /tmp/z");
+		assertThat(semChave.getExitCode()).as("sem a chave").isEqualTo(126);
+		assertThat(executor.execInContainer("sh", "-c", "recuperar-wal.sh /tmp/nao-existe 0000000100000000000000F9 /tmp/z")
+				.getExitCode()).as("pasta inacessível").isEqualTo(126);
+
+		ExecResult aspas = executor.execInContainer("sh", "-c", "restaurar.sh /backups /tmp/destino-aspas \"/tmp/wa'l\"");
+		assertThat(aspas.getExitCode()).isNotZero();
+		assertThat(aspas.getStderr()).contains("não pode ter aspas");
+	}
+
 	/** A imagem, sem argumentos, sobe o crond com a cadeia semanal e o incremental diário. */
 	@Test
 	void imagemSobeOAgendadorComCompletoSemanalEIncrementalDiario() throws Exception {
@@ -177,23 +312,63 @@ class BackupERestauracaoTest {
 			agendador.start();
 			ExecResult agenda = agendador.execInContainer("cat", "/etc/crontabs/root");
 			assertThat(agenda.getStdout())
-					.contains("0 2 * * 0   . /etc/sigh-backup/ambiente && /opt/sigh-backup/backup-completo.sh")
-					.contains("0 2 * * 1-6 . /etc/sigh-backup/ambiente && /opt/sigh-backup/backup-incremental.sh");
+					.contains("0 2 * * 0   . /etc/sigh-backup/ambiente && /opt/sigh-backup/backup-completo.sh >> /proc/1/fd/1 2>&1")
+					.contains("0 2 * * 1-6 . /etc/sigh-backup/ambiente && /opt/sigh-backup/backup-incremental.sh >> /proc/1/fd/1 2>&1");
 			assertThat(agendador.execInContainer("pgrep", "crond").getExitCode()).isZero();
 			assertThat(agendador.execInContainer("stat", "-c", "%a", "/etc/sigh-backup/ambiente").getStdout().strip())
 					.isEqualTo("600");
-			assertThat(agendador.execInContainer("sh", "-c", ". /etc/sigh-backup/ambiente && echo $PGHOST").getStdout().strip())
-					.isEqualTo("banco");
+			assertThat(agendador.execInContainer("sh", "-c", ". /etc/sigh-backup/ambiente && echo $PGHOST $PGSSLMODE")
+					.getStdout().strip()).isEqualTo("banco verify-full");
+			// Instalação nova: o primeiro completo roda já, e o alerta apaga sem esperar o domingo.
+			// Um exec só, com a espera dentro do container (até 2 min): muitos execs seguidos já travaram o Docker.
+			ExecResult saude = agendador.execInContainer("sh", "-c",
+					"for i in $(seq 60); do verificar-backup.sh && exit 0; sleep 2; done; exit 1");
+			assertThat(saude.getExitCode()).as(saude.getStdout()).isZero();
+			assertThat(agendador.execInContainer("cat", "/backups/cadeia-atual").getExitCode()).isZero();
 		}
 	}
 
 	private static GenericContainer<?> novoExecutor() {
-		return new GenericContainer<>(imagem)
+		return new GenericContainer<>(BancoDoSigh.imagem())
 				.withNetwork(rede)
 				.withEnv("PGHOST", "banco").withEnv("PGPORT", "5432")
-				.withEnv("PGUSER", banco.getUsername()).withEnv("PGPASSWORD", banco.getPassword())
+				.withEnv("PGUSER", BancoDoSigh.USUARIO).withEnv("PGPASSWORD", BancoDoSigh.SENHA)
+				.withEnv("PGSSLMODE", "verify-full").withEnv("PGSSLROOTCERT", "/certs/autoridade.crt")
 				.withEnv("SIGH_BACKUP_DIR", "/backups").withEnv("SIGH_BACKUP_DESTINO_EXTERNO", "/externo")
-				.withEnv("SIGH_CHAVE_BACKUP", CHAVE_BACKUP);
+				.withEnv("SIGH_CHAVE_BACKUP", CHAVE_BACKUP).withEnv("SIGH_WAL_DIR", "/wal")
+				.withCopyFileToContainer(MountableFile.forHostPath(certificado.certificadoPem(), 0644), "/certs/autoridade.crt")
+				.withCreateContainerCmdModifier(comando -> comando.getHostConfig()
+						.withBinds(new Bind(VOLUME_WAL, new Volume("/wal"))));
+	}
+
+	/** Decifra todo o WAL arquivado em /wal e procura o texto nos segmentos decifrados. */
+	private static boolean walDecifradoContem(String texto) throws Exception {
+		rodar("rm -rf /tmp/wal-decifrado && mkdir /tmp/wal-decifrado && printf '%s' \"$SIGH_CHAVE_BACKUP\" > /tmp/k"
+				+ " && for f in /wal/*.gpg; do gpg --batch --quiet --pinentry-mode loopback --passphrase-file /tmp/k"
+				+ " --decrypt \"$f\" | gzip -dc > /tmp/wal-decifrado/$(basename \"$f\" .gpg); done; rm -f /tmp/k");
+		return encontra(texto, "/tmp/wal-decifrado");
+	}
+
+	private static void escreverNoWal() {
+		jdbc.execute("create table if not exists teste_wal (momento timestamptz)");
+		jdbc.update("insert into teste_wal values (now())");
+	}
+
+	/** Força a troca de segmento, espera o servidor arquivá-lo e devolve o nome dele. */
+	private static String arquivarWalAtual() throws Exception {
+		escreverNoWal();
+		String segmento = jdbc.queryForObject("select pg_walfile_name(pg_switch_wal())", String.class);
+		esperar(() -> rodar("ls /wal").getStdout().contains(segmento + ".gpg"));
+		return segmento;
+	}
+
+	/** O servidor restaurado fica em segundo plano; sem soltar a saída do exec, a sessão do Docker não termina. */
+	private static void subirRestaurado(String pasta, int porta) throws Exception {
+		rodar("chown -R postgres:postgres " + pasta + " && chmod 700 " + pasta
+				+ " && su postgres -s /bin/sh -c \"pg_ctl -D " + pasta + " -l /tmp/restaurado-" + porta + ".log"
+				+ " -o '-p " + porta + " -c listen_addresses=127.0.0.1' start\" </dev/null >/dev/null 2>&1");
+		esperar(() -> executor.execInContainer("sh", "-c", "PGSSLMODE=disable psql -h 127.0.0.1 -p " + porta + " -d "
+				+ BancoDoSigh.BANCO + " -Atc 'select not pg_is_in_recovery()'").getStdout().strip().equals("t"));
 	}
 
 	private static void decifrarParte(String cadeia, String parte, String destino) throws Exception {
@@ -218,10 +393,32 @@ class BackupERestauracaoTest {
 		return resultado;
 	}
 
+	/** Consulta no servidor restaurado, local ao executor e sem TLS (é uma cópia de conferência). */
+	private static String psql(int porta, String consulta) throws Exception {
+		return rodar("PGSSLMODE=disable psql -h 127.0.0.1 -p " + porta + " -d " + BancoDoSigh.BANCO + " -Atc \"" + consulta
+				+ "\"").getStdout().strip();
+	}
+
+	@FunctionalInterface
+	private interface Condicao {
+		boolean valida() throws Exception;
+	}
+
+	private static void esperar(Condicao condicao) throws Exception {
+		for (int tentativa = 0; tentativa < 120; tentativa++) {
+			if (condicao.valida()) {
+				return;
+			}
+			Thread.sleep(500);
+		}
+		throw new AssertionError("A condição não foi atingida em 60 s.");
+	}
+
 	/** Paciente com um diagnóstico; {@code cifrado} falso simula dado gravado antes da criptografia. */
 	private static void inserirPaciente(int numero, boolean cifrado) {
 		UUID paciente = UUID.randomUUID();
 		UUID prontuario = UUID.randomUUID();
+		UUID registro = UUID.randomUUID();
 		jdbc.update("insert into paciente (id, cpf, nome, data_nascimento) values (?, ?, ?, ?)", paciente,
 				String.format("%011d", 90_000_000_000L + numero), "Paciente Fictício " + MARCADOR_NOME + " " + numero,
 				LocalDate.of(1980, 1, numero));
@@ -232,8 +429,9 @@ class BackupERestauracaoTest {
 		jdbc.update("""
 				insert into registro_clinico (id, prontuario_id, tipo, criado_em, conteudo, categoria_informacao,
 				  codigo_cid10, autor_id, origem_id) values (?, ?, 'DIAGNOSTICO', ?, ?, 'Saúde mental', ?, ?, ?)
-				""", UUID.randomUUID(), prontuario, LocalDateTime.of(2026, 11, 1, 9, 0),
-				cifrado ? CIFRA.cifrar(conteudo) : conteudo, cifrado ? CIFRA.cifrar(cid) : cid, autorId, instituicaoId);
+				""", registro, prontuario, LocalDateTime.of(2026, 11, 1, 9, 0),
+				cifrado ? CIFRA.cifrar(conteudo, "registro_clinico.conteudo", registro) : conteudo,
+				cifrado ? CIFRA.cifrar(cid, "registro_clinico.codigo_cid10", registro) : cid, autorId, instituicaoId);
 	}
 
 	/** md5 de todas as linhas das tabelas, em ordem: igual na origem e na cópia restaurada. */
@@ -247,7 +445,6 @@ class BackupERestauracaoTest {
 		if (portaRestaurada == null) {
 			return jdbc.queryForObject(consulta.toString(), String.class);
 		}
-		return rodar("psql -h 127.0.0.1 -p " + portaRestaurada + " -U " + banco.getUsername() + " -d "
-				+ banco.getDatabaseName() + " -Atc \"" + consulta + "\"").getStdout().strip();
+		return psql(portaRestaurada, consulta.toString());
 	}
 }

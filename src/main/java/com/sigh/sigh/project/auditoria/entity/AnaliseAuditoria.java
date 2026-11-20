@@ -1,9 +1,10 @@
 package com.sigh.sigh.project.auditoria.entity;
 
-import com.sigh.sigh.project.comum.cripto.TextoCifrado;
+import com.sigh.sigh.project.comum.cripto.Cifrado;
+import lombok.AccessLevel;
+import com.sigh.sigh.project.comum.cripto.CifragemDasEntidades;
 import com.sigh.sigh.project.usuario.entity.Usuario;
 import jakarta.persistence.*;
-import jakarta.persistence.Convert;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -11,6 +12,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
+@EntityListeners(CifragemDasEntidades.class)
 @Table(name = "analise_auditoria")
 @Getter
 @Setter
@@ -31,9 +33,19 @@ public class AnaliseAuditoria {
 	@Enumerated(EnumType.STRING)
 	private ConclusaoAnalise conclusao;
 
-	@Convert(converter = TextoCifrado.class)
+	@Transient
+	@Cifrado(gravadoEm = "descricaoCifrado")
 	private String descricao;
+	@Column(name = "descricao")
+	@Getter(AccessLevel.NONE)
+	@Setter(AccessLevel.NONE)
+	private String descricaoCifrado;
 
 	@ManyToOne(fetch = FetchType.LAZY)
 	private Usuario auditor;
+
+	public void setDescricao(String descricao) {
+		this.descricao = descricao;
+		this.descricaoCifrado = Cifrado.PENDENTE;
+	}
 }

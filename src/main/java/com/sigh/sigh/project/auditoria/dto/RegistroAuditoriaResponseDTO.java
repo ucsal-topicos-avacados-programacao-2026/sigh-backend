@@ -1,5 +1,6 @@
 package com.sigh.sigh.project.auditoria.dto;
 
+import com.sigh.sigh.project.auditoria.entity.RegistroAuditoria;
 import com.sigh.sigh.project.usuario.entity.Perfil;
 
 import java.time.LocalDateTime;
@@ -15,4 +16,13 @@ public record RegistroAuditoriaResponseDTO(
 		String finalidade,
 		boolean emergencia,
 		String justificativa) {
+
+	/** A partir do registro já carregado (com a justificativa decifrada) e com ator e instituição buscados. */
+	public static RegistroAuditoriaResponseDTO de(RegistroAuditoria registro) {
+		return new RegistroAuditoriaResponseDTO(registro.getId(),
+				registro.getProntuario() == null ? null : registro.getProntuario().getId(), registro.getAtor().getNome(),
+				registro.getPerfil(), registro.getInstituicao() == null ? null : registro.getInstituicao().getNome(),
+				registro.getOcorridoEm(), registro.getFinalidadeDeclarada(), registro.isEmergencia(),
+				registro.getJustificativa());
+	}
 }

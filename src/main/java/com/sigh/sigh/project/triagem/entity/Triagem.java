@@ -1,11 +1,12 @@
 package com.sigh.sigh.project.triagem.entity;
 
-import com.sigh.sigh.project.comum.cripto.TextoCifrado;
+import com.sigh.sigh.project.comum.cripto.Cifrado;
+import lombok.AccessLevel;
+import com.sigh.sigh.project.comum.cripto.CifragemDasEntidades;
 import com.sigh.sigh.project.prontuario.entity.Atendimento;
 import com.sigh.sigh.project.prontuario.entity.RegistroClinico;
 import com.sigh.sigh.project.usuario.entity.Usuario;
 import jakarta.persistence.*;
-import jakarta.persistence.Convert;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -15,6 +16,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Entity
+@EntityListeners(CifragemDasEntidades.class)
 @Table(name = "triagem")
 @Getter
 @Setter
@@ -27,8 +29,13 @@ public class Triagem {
 	@ManyToOne(fetch = FetchType.LAZY)
 	private Atendimento atendimento;
 
-	@Convert(converter = TextoCifrado.class)
+	@Transient
+	@Cifrado(gravadoEm = "sintomasCifrado")
 	private String sintomas;
+	@Column(name = "sintomas")
+	@Getter(AccessLevel.NONE)
+	@Setter(AccessLevel.NONE)
+	private String sintomasCifrado;
 
 	@Embedded
 	private SinaisVitais sinaisVitais;
@@ -49,4 +56,9 @@ public class Triagem {
 
 	@ManyToMany
 	private Set<RegistroClinico> fontesHistorico = new HashSet<>();
+
+	public void setSintomas(String sintomas) {
+		this.sintomas = sintomas;
+		this.sintomasCifrado = Cifrado.PENDENTE;
+	}
 }
