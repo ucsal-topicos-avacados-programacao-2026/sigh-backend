@@ -14,14 +14,14 @@ import java.util.UUID;
 public interface RegistroClinicoRepository extends JpaRepository<RegistroClinico, UUID> {
 
 	/**
-	 * Categoria é texto livre: a comparação ignora maiúsculas, acentos e espaços repetidos, para que
-	 * "saude  MENTAL" e "Saúde mental" sejam a mesma categoria. A mesma regra está em
-	 * {@link com.sigh.sigh.project.paciente.service.CategoriaDeInformacao}.
+	 * Categoria é texto livre: a comparação colapsa espaços em branco, tira os das pontas e ignora acentos e
+	 * maiúsculas, para que "saude  MENTAL" e "Saúde mental" sejam a mesma categoria. A mesma regra está em
+	 * {@link com.sigh.sigh.project.paciente.service.CategoriaDeInformacao} e no índice da V4.
 	 */
 	String ACENTOS = "ÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇáàâãäéèêëíìîïóòôõöúùûüç";
 	String SEM_ACENTOS = "AAAAAEEEEIIIIOOOOOUUUUCaaaaaeeeeiiiiooooouuuuc";
-	String NORMALIZAR = "lower(function('translate', function('regexp_replace', trim(";
-	String FIM_NORMALIZAR = "), '\\s+', ' ', 'g'), '" + ACENTOS + "', '" + SEM_ACENTOS + "'))";
+	String NORMALIZAR = "lower(function('translate', trim(function('regexp_replace', ";
+	String FIM_NORMALIZAR = ", '\\s+', ' ', 'g')), '" + ACENTOS + "', '" + SEM_ACENTOS + "'))";
 
 	/** O registro está coberto por uma restrição vigente do paciente (RF-009): ele próprio ou a categoria dele. */
 	String RESTRICAO_VIGENTE = """

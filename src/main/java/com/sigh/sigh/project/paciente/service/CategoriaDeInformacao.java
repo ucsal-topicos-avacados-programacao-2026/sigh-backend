@@ -14,9 +14,9 @@ final class CategoriaDeInformacao {
 	private CategoriaDeInformacao() {
 	}
 
-	/** Como a categoria é gravada: sem espaços nas pontas e sem espaços repetidos. */
+	/** Como a categoria é gravada: espaços em branco colapsados e sem espaços nas pontas (mesma ordem do banco). */
 	static String apresentavel(String categoria) {
-		return categoria.strip().replaceAll("\\s+", " ");
+		return categoria.replaceAll("\\s+", " ").strip();
 	}
 
 	static boolean mesma(String uma, String outra) {
