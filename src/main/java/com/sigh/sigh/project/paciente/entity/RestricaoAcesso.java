@@ -32,4 +32,7 @@ public class RestricaoAcesso {
 
 	@ManyToOne(fetch = FetchType.LAZY)
 	private Usuario definidaPor;
+
+	@ManyToOne(fetch = FetchType.LAZY)
+	private Usuario encerradaPor;
 }
