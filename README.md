@@ -69,20 +69,53 @@ Não há teto de acessos por profissional: um teto poderia bloquear uma emergên
 
 ### Onde o dado clínico é decifrado
 
-O dado clínico é decifrado em **dois pontos**:
-- **O back-end.** Banco, cópias de segurança e quem opera esses dois veem apenas texto cifrado. Entre o cliente e o back-end, o dado viaja em TLS, sem terminar a conexão num intermediário.
-- **O serviço de IA** da triagem e do resumo (RF-003, RF-004). Ele recebe do back-end o caso e o histórico autorizado em texto claro, porque precisa ler o conteúdo. Se a IA ficar fora da máquina do back-end, ela é um componente que processa o dado e precisa ser autorizado no C4. No perfil `tls`, o back-end só aceita uma URL de IA em HTTPS (`sigh.ia.exigir-https`), salvo um serviço na própria máquina.
+Os hospitais da rede não trocam prontuário entre si. O prontuário é um só e fica na API da rede, e cada hospital acessa pelo navegador. Por isso, a ponta a ponta vai do navegador do profissional autorizado até a API, e da API até o serviço de IA. Pelo RNF-004, só os componentes autorizados leem o dado clínico em claro, e nenhum intermediário de transporte lê.
+
+**Quem lê o dado clínico em claro:**
+
+| Componente | Lê em claro? | Por quê | Prova |
+|---|---|---|---|
+| API (este back-end) | Sim | Só ela tem `SIGH_CHAVE_DADOS`: decifra ao carregar e cifra antes de gravar | `CriptografiaEmRepousoTest` |
+| Serviço de IA da triagem e do resumo (RF-003, RF-004) | Sim | Recebe da API o caso e o histórico autorizado, porque precisa ler o conteúdo | `ClienteIATest` (o que é enviado), `IAConfigTest` (para onde) |
+| Navegador do profissional | Sim, só o que a API devolve | A API confere perfil, vínculo com a instituição e consentimento antes de responder | `VinculoEmTodaRotaTest`, `EmergenciaControladaTest` |
+| Rede entre navegador e API, e entre API e banco | Não | TLS terminado na própria API e no próprio banco, com o certificado conferido | `TlsTest` |
+| Caminho da API até a IA | Não | Na própria máquina (o padrão), o pedido não sai para a rede: vai pelo loopback, em HTTP, sem passar por proxy. Num host autorizado, vai por HTTPS, com a conferência padrão da JDK (certificado e nome do host), que não tem teste próprio aqui | `IAConfigTest` (destino, sem redirecionamento e sem proxy) |
+| Banco e quem o administra | Não | As colunas clínicas estão cifradas, e o banco nunca recebe a chave dos dados | `CriptografiaEmRepousoTest` |
+| Cópias de segurança, WAL arquivado e destino externo | Não | O arquivo é cifrado com `SIGH_CHAVE_BACKUP`, e dentro dele as colunas clínicas continuam cifradas com a chave dos dados | `BackupERestauracaoTest` |
+
+**A IA só recebe dado num destino autorizado.** No perfil `tls` (`sigh.ia.restringir-destino`), a API não sobe se `sigh.ia.url` apontar para outro lugar. O destino tem de ser:
+- um serviço na própria máquina (`localhost`, `127.0.0.1` ou `[::1]`), que é o padrão, com o Ollama local;
+- ou um host listado em `SIGH_IA_HOSTS_AUTORIZADOS` (separados por vírgula), e então só por HTTPS.
+
+A API também não segue redirecionamento da IA, porque um redirecionamento levaria o dado a um destino que não passou por essa conferência. E não passa por proxy configurado na JVM, que veria em claro o tráfego HTTP para a IA na própria máquina. Para pôr a IA em outra máquina, inclua o host na lista e no C4, como componente autorizado.
+
+**Um proxy ou balanceador** que termine o TLS antes da API vira ponto de decifragem. A implantação deste trabalho não tem nenhum. Se um for colocado, ele precisa entrar no C4.
+
+**Quem guarda cada chave:**
+
+| Chave | Fica com | Quem a tem consegue ler |
+|---|---|---|
+| `SIGH_CHAVE_DADOS` (e as anteriores) | Só a API | O dado clínico. É o que faz da API um ponto de decifragem |
+| `SIGH_TLS_CHAVE_PRIVADA` | Só a API | O tráfego que chega à API |
+| Chave TLS do banco (`SIGH_TLS_CHAVE_BANCO`) | Só o servidor do banco | O tráfego que chega ao banco, onde o dado clínico já vem cifrado |
+| `SIGH_CHAVE_BACKUP` | O executor de backup e o servidor do banco, para arquivar o WAL | O conteúdo das cópias, que é o mesmo do banco: o dado clínico continua cifrado |
+| Chave TLS do serviço de IA, se ele estiver em outra máquina | Só o serviço de IA | O tráfego que chega à IA, que já é um ponto de decifragem |
+| `SIGH_IA_CHAVE` | A API e o serviço de IA, que a confere | Nada: só identifica a API para a IA, e não cifra dado |
+
+Os valores ficam fora do repositório (veja "Chaves").
+
+**Transporte, trecho a trecho:**
 
 | Trecho | Proteção | Situação |
 |---|---|---|
 | Navegador → back-end | HTTPS (TLS 1.3 ou 1.2), HSTS | Testado (`TlsTest`) |
-| Back-end → serviço de IA | HTTPS obrigatório no perfil `tls` | Testado (`IAConfigTest`) |
+| Back-end → serviço de IA | No perfil `tls`, só na própria máquina (loopback, sem TLS) ou num host autorizado por HTTPS; sem seguir redirecionamento e sem proxy | Testado (`IAConfigTest`, `TlsTest`) |
 | Back-end → banco | TLS com o certificado do servidor conferido (`sslmode=verify-full`); no perfil `tls`, sem isso a aplicação não sobe | Testado (`TlsTest`) |
 | Executor de backup → banco | TLS com o certificado conferido (`PGSSLMODE=verify-full`); sem isso o backup não roda | Testado (`BackupERestauracaoTest`) |
 | Banco | Só aceita conexão com TLS; AES-256-GCM nas colunas clínicas, feita pela aplicação, com o valor preso à linha | Testado (`TlsTest`, `CriptografiaEmRepousoTest`) |
 | Cópias de segurança e WAL arquivado | Arquivo inteiro cifrado (OpenPGP simétrico AES-256, com verificação de integridade) | Testado (`BackupERestauracaoTest`) |
 
-A ERS pede criptografia de ponta a ponta entre as instituições "conforme definido no C4". O C4 ainda não existe (é entrega da Unidade 2). O desenho acima é a proposta: como o prontuário é um só e fica no back-end da rede, os pontos de decifragem são o back-end e o serviço de IA, e nem transporte, nem banco, nem backup veem o texto claro. Isso precisa ser confirmado quando o C4 for feito (card BE-23).
+O modelo C4 da Unidade 2 deve mostrar estes mesmos pontos de decifragem e estas mesmas chaves (card BE-23).
 
 ### Colunas cifradas
 
@@ -182,7 +215,8 @@ O teste `TlsTest` sobe o back-end nesse perfil contra esse banco, com certificad
 - HTTP em claro na mesma porta é recusado;
 - a sessão da aplicação com o banco usa TLS 1.3;
 - o banco recusa conexão sem TLS e o cliente recusa um certificado de banco em que não confia;
-- sem `verify-full`, a aplicação de verdade não sobe e o banco fica sem migração nenhuma.
+- sem `verify-full`, a aplicação de verdade não sobe e o banco fica sem migração nenhuma;
+- a aplicação de verdade também não sobe com a IA num host fora de `SIGH_IA_HOSTS_AUTORIZADOS`, nem com um host autorizado sem HTTPS.
 
 ### Backup
 
@@ -238,7 +272,7 @@ Comportamento da rotina:
 
 ### Limites conhecidos
 
-- **C4 (card BE-23):** a criptografia de ponta a ponta entre instituições, inclusive o papel do serviço de IA, depende do C4 (veja acima).
+- **C4 (card BE-23):** os pontos de decifragem e as chaves acima ainda precisam aparecer no modelo C4 da Unidade 2.
 - **Cofre de chaves:** decidido não usar no trabalho, que roda localmente (veja "Chaves").
 - **Valor copiado de outra linha:** é recusado na leitura, mas a manutenção ao subir não decifra todos os valores para procurá-los. Ela só conta os que estão fora do formato.
 - **Valor antigo da mesma linha:** o vínculo prende o valor à linha e à coluna, não a uma versão. Recolocar um valor cifrado mais antigo da mesma linha, tirado de um backup, é aceito.
