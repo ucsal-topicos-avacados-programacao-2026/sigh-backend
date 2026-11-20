@@ -91,7 +91,7 @@ class TriagemControllerTest {
 	@WithMockUser(roles = "MEDICO")
 	void medicoConsultaAFila() throws Exception {
 		UUID instituicaoId = UUID.randomUUID();
-		when(filaAtendimentoService.consultarFila(eq(instituicaoId), any())).thenReturn(Page.empty());
+		when(filaAtendimentoService.consultarFila(eq(instituicaoId), any(), any())).thenReturn(Page.empty());
 
 		mockMvc.perform(get("/triagens/fila").param("instituicaoId", instituicaoId.toString()))
 				.andExpect(status().isOk());

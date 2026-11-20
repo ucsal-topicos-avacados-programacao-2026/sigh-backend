@@ -68,16 +68,20 @@ class HistoricoAutorizadoServiceTest {
 		atendimento.setInstituicao(instituicao);
 	}
 
-	/** NEGADO, sem manifestação, revogado sem atendimento anterior na instituição ou instituição não credenciada. */
+	/**
+	 * NEGADO, sem manifestação, revogado sem atendimento anterior na instituição ou instituição não
+	 * credenciada: a consulta fica limitada aos registros da própria instituição (BE-14).
+	 */
 	@Test
-	void consentimentoQueNaoPermiteCompartilharNaoLiberaHistoricoNemGeraAcesso() {
+	void consentimentoQueNaoPermiteCompartilharLimitaAosRegistrosDaPropriaInstituicaoSemGerarAcessoVazio() {
 		compartilhamentoPermitido(false);
 
 		List<RegistroClinico> historico = historicoAutorizadoService.consultar(atendimento, CONSULTA_DO_MEDICO);
 
 		assertThat(historico).isEmpty();
 		verify(consentimentoService).podeCompartilharCom(pacienteId, atendimento.getInstituicao().getId());
-		verify(registroClinicoRepository, never()).buscarHistoricoSemRestricao(any(), any(), any());
+		verify(registroClinicoRepository).historicoVisivel(eq(atendimento.getProntuario().getId()),
+				eq(atendimento.getInstituicao().getId()), eq(false), any(), eq(Limit.of(LIMITE_DE_REGISTROS)));
 		verify(registroAuditoriaService, never()).registrarAcesso(any());
 	}
 
@@ -86,8 +90,8 @@ class HistoricoAutorizadoServiceTest {
 		RegistroClinico registro = new RegistroClinico();
 		registro.setId(UUID.randomUUID());
 		compartilhamentoPermitido(true);
-		when(registroClinicoRepository.buscarHistoricoSemRestricao(
-				eq(atendimento.getProntuario().getId()), any(), eq(Limit.of(LIMITE_DE_REGISTROS))))
+		when(registroClinicoRepository.historicoVisivel(eq(atendimento.getProntuario().getId()),
+				eq(atendimento.getInstituicao().getId()), eq(true), any(), eq(Limit.of(LIMITE_DE_REGISTROS))))
 				.thenReturn(List.of(registro));
 
 		List<RegistroClinico> historico = historicoAutorizadoService.consultar(atendimento, CONSULTA_DO_MEDICO);
@@ -98,6 +102,35 @@ class HistoricoAutorizadoServiceTest {
 		assertThat(acesso.getValue().perfil()).isEqualTo(Perfil.MEDICO);
 		assertThat(acesso.getValue().finalidade()).isEqualTo("Resumo do histórico por IA");
 		assertThat(acesso.getValue().registrosAcessadosIds()).containsExactly(registro.getId());
+		assertThat(acesso.getValue().emergencia()).isFalse();
+	}
+
+	/** RN-003: a justificativa vai para a auditoria mesmo quando o prontuário está vazio. */
+	@Test
+	void acessoDeEmergenciaRegistraAJustificativaETrazOProntuarioInteiro() {
+		RegistroClinico restrito = new RegistroClinico();
+		restrito.setId(UUID.randomUUID());
+		when(registroClinicoRepository.historicoCompleto(atendimento.getProntuario().getId())).thenReturn(List.of(restrito));
+
+		List<RegistroClinico> historico = historicoAutorizadoService.consultarEmEmergencia(atendimento,
+				CONSULTA_DO_MEDICO, "Paciente inconsciente, risco iminente de morte");
+
+		assertThat(historico).containsExactly(restrito);
+		ArgumentCaptor<AcessoProntuarioDTO> acesso = ArgumentCaptor.forClass(AcessoProntuarioDTO.class);
+		verify(registroAuditoriaService).registrarAcesso(acesso.capture());
+		assertThat(acesso.getValue().emergencia()).isTrue();
+		assertThat(acesso.getValue().justificativa()).isEqualTo("Paciente inconsciente, risco iminente de morte");
+		assertThat(acesso.getValue().registrosAcessadosIds()).containsExactly(restrito.getId());
+		verify(consentimentoService, never()).podeCompartilharCom(any(), any());
+	}
+
+	@Test
+	void acessoDeEmergenciaComProntuarioVazioTambemFicaNaAuditoria() {
+		when(registroClinicoRepository.historicoCompleto(atendimento.getProntuario().getId())).thenReturn(List.of());
+
+		historicoAutorizadoService.consultarEmEmergencia(atendimento, CONSULTA_DO_MEDICO, "Parada cardiorrespiratória em curso");
+
+		verify(registroAuditoriaService).registrarAcesso(any());
 	}
 
 	private void compartilhamentoPermitido(boolean permitido) {

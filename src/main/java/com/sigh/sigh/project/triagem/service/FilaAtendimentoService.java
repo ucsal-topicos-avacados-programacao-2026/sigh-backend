@@ -5,6 +5,8 @@ import com.sigh.sigh.project.triagem.config.TempoMaximoEsperaProperties;
 import com.sigh.sigh.project.triagem.dto.PacienteNaFilaDTO;
 import com.sigh.sigh.project.triagem.entity.Triagem;
 import com.sigh.sigh.project.triagem.repository.TriagemRepository;
+import com.sigh.sigh.project.usuario.entity.Perfil;
+import com.sigh.sigh.project.usuario.service.VinculoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,9 +25,11 @@ public class FilaAtendimentoService {
 	private final TriagemRepository triagemRepository;
 	private final TempoMaximoEsperaProperties tempoMaximoEspera;
 	private final Clock clock;
+	private final VinculoService vinculoService;
 
 	@Transactional(readOnly = true)
-	public Page<PacienteNaFilaDTO> consultarFila(UUID instituicaoId, Pageable paginacao) {
+	public Page<PacienteNaFilaDTO> consultarFila(UUID instituicaoId, String login, Pageable paginacao) {
+		vinculoService.exigirVinculoAtivo(login, instituicaoId, Perfil.ENFERMEIRO, Perfil.MEDICO);
 		LocalDateTime agora = LocalDateTime.now(clock);
 		return triagemRepository.buscarFila(instituicaoId, paginacao)
 				.map(triagem -> paraPacienteNaFila(triagem, agora));

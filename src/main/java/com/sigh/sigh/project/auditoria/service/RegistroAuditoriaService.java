@@ -39,7 +39,7 @@ public class RegistroAuditoriaService {
 		registro.setProntuario(prontuarioRepository.getReferenceById(acesso.prontuarioId()));
 		registro.setAtor(usuarioService.buscarPorLogin(acesso.loginAtor()));
 		registro.setPerfil(acesso.perfil());
-		registro.setInstituicao(instituicaoRepository.getReferenceById(acesso.instituicaoId()));
+		registro.setInstituicao(acesso.instituicaoId() == null ? null : instituicaoRepository.getReferenceById(acesso.instituicaoId()));
 		registro.setOcorridoEm(LocalDateTime.now(clock));
 		registro.setFinalidadeDeclarada(acesso.finalidade());
 		registro.setEmergencia(acesso.emergencia());
