@@ -16,13 +16,16 @@ import com.sigh.sigh.project.prontuario.entity.RegistroClinico;
 import com.sigh.sigh.project.prontuario.entity.TipoRegistro;
 import com.sigh.sigh.project.prontuario.repository.AtendimentoRepository;
 import com.sigh.sigh.project.prontuario.repository.RegistroClinicoRepository;
+import com.sigh.sigh.project.support.RelogioDeTeste;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,6 +39,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class InternacaoServiceTest {
+
+	private static final LocalDateTime AGORA = LocalDateTime.of(2026, 11, 19, 10, 30);
 
 	@Mock
 	private InternacaoRepository internacaoRepository;
@@ -51,6 +56,9 @@ class InternacaoServiceTest {
 
 	@Mock
 	private RegistroClinicoRepository registroClinicoRepository;
+
+	@Spy
+	private Clock clock = RelogioDeTeste.em(AGORA);
 
 	@InjectMocks
 	private InternacaoService internacaoService;
@@ -111,7 +119,7 @@ class InternacaoServiceTest {
 		internacaoService.transferir(internacao.getId(), destino.getId());
 
 		assertThat(origem.getStatus()).isEqualTo(StatusLeito.EM_HIGIENIZACAO);
-		assertThat(ocupacaoAtual.getFimEm()).isNotNull();
+		assertThat(ocupacaoAtual.getFimEm()).isEqualTo(AGORA);
 		assertThat(destino.getStatus()).isEqualTo(StatusLeito.OCUPADO);
 	}
 
@@ -139,7 +147,7 @@ class InternacaoServiceTest {
 
 		internacaoService.darAlta(internacao.getId(), resumo.getId());
 
-		assertThat(internacao.getAltaEm()).isNotNull();
+		assertThat(internacao.getAltaEm()).isEqualTo(AGORA);
 		assertThat(internacao.getResumoAlta()).isSameAs(resumo);
 		assertThat(leito.getStatus()).isEqualTo(StatusLeito.EM_HIGIENIZACAO);
 	}
@@ -170,7 +178,7 @@ class InternacaoServiceTest {
 	@Test
 	void internacaoJaEncerradaNaoAceitaTransferencia() {
 		Internacao internacao = novaInternacao();
-		internacao.setAltaEm(LocalDateTime.now());
+		internacao.setAltaEm(LocalDateTime.now(clock));
 		when(internacaoRepository.findById(internacao.getId())).thenReturn(Optional.of(internacao));
 
 		assertThatThrownBy(() -> internacaoService.transferir(internacao.getId(), UUID.randomUUID()))

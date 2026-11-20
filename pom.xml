@@ -152,6 +152,15 @@
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<!-- A JVM dos testes roda em UTC e o relógio da aplicação em America/Bahia: qualquer
+					     data ou hora que não venha do relógio único aparece como diferença de fuso. -->
+					<argLine>-Duser.timezone=UTC</argLine>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
 				<executions>
 					<execution>

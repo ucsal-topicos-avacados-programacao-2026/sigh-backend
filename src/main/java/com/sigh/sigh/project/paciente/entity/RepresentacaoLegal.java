@@ -28,8 +28,7 @@ public class RepresentacaoLegal {
 	private LocalDateTime fimEm;
 	private String documento;
 
-	public boolean validarVigencia() {
-		LocalDateTime agora = LocalDateTime.now();
+	public boolean validarVigencia(LocalDateTime agora) {
 		return !inicioEm.isAfter(agora) && (fimEm == null || fimEm.isAfter(agora));
 	}
 }

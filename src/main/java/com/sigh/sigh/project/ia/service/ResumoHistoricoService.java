@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
@@ -42,6 +43,7 @@ public class ResumoHistoricoService {
 	private final RegistroAuditoriaService registroAuditoriaService;
 	private final UsuarioService usuarioService;
 	private final IAProperties iaProperties;
+	private final Clock clock;
 
 	@Transactional
 	public CasoResumoDTO solicitar(UUID atendimentoId, String loginMedico) {
@@ -66,7 +68,7 @@ public class ResumoHistoricoService {
 	public ResumoHistoricoResponseDTO concluir(UUID resumoId, String texto) {
 		ResumoHistoricoIA resumo = buscar(resumoId);
 		resumo.setTexto(texto);
-		resumo.setGeradoEm(LocalDateTime.now());
+		resumo.setGeradoEm(LocalDateTime.now(clock));
 		resumo.setModeloVersao(iaProperties.modelo());
 		resumo.setStatus(StatusResumo.GERADO);
 		return ResumoHistoricoResponseDTO.de(resumo);

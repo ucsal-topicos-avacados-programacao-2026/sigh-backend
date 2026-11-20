@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -25,6 +26,7 @@ public class AtendimentoService {
 	private final AtendimentoRepository atendimentoRepository;
 	private final RegistroClinicoRepository registroClinicoRepository;
 	private final UsuarioService usuarioService;
+	private final Clock clock;
 
 	@Transactional
 	public RegistroClinicoResponseDTO registrar(UUID atendimentoId, RegistroClinicoRequestDTO dados, String loginMedico) {
@@ -35,7 +37,7 @@ public class AtendimentoService {
 		registro.setProntuario(atendimento.getProntuario());
 		registro.setAtendimento(atendimento);
 		registro.setTipo(dados.tipo());
-		registro.setCriadoEm(LocalDateTime.now());
+		registro.setCriadoEm(LocalDateTime.now(clock));
 		registro.setConteudo(dados.conteudo());
 		registro.setCategoriaInformacao(dados.categoriaInformacao());
 		registro.setCodigoCID10(dados.codigoCID10());
@@ -62,7 +64,7 @@ public class AtendimentoService {
 		if (atendimento.getInicioClinicoEm() != null) {
 			return;
 		}
-		atendimento.setInicioClinicoEm(LocalDateTime.now());
+		atendimento.setInicioClinicoEm(LocalDateTime.now(clock));
 		atendimento.setMedicoResponsavel(medico);
 		atendimento.setStatus(StatusAtendimento.EM_ATENDIMENTO);
 	}

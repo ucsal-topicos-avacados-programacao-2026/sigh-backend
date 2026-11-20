@@ -4,6 +4,7 @@ import com.sigh.sigh.project.comum.erro.RegraNegocioException;
 import com.sigh.sigh.project.prontuario.entity.Atendimento;
 import com.sigh.sigh.project.prontuario.entity.StatusAtendimento;
 import com.sigh.sigh.project.prontuario.repository.AtendimentoRepository;
+import com.sigh.sigh.project.support.RelogioDeTeste;
 import com.sigh.sigh.project.triagem.dto.SinaisVitaisDTO;
 import com.sigh.sigh.project.triagem.dto.TriagemRequestDTO;
 import com.sigh.sigh.project.triagem.dto.TriagemResponseDTO;
@@ -16,9 +17,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,6 +36,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class TriagemServiceTest {
 
+	private static final LocalDateTime AGORA = LocalDateTime.of(2026, 11, 19, 10, 30);
+
 	private static final String LOGIN_ENFERMEIRO = "enfermeira.teste";
 	private static final SinaisVitaisDTO SINAIS_VITAIS = new SinaisVitaisDTO(
 			"120/80", 88, 18, new BigDecimal("37.2"), new BigDecimal("97"));
@@ -44,6 +50,9 @@ class TriagemServiceTest {
 
 	@Mock
 	private UsuarioService usuarioService;
+
+	@Spy
+	private Clock clock = RelogioDeTeste.em(AGORA);
 
 	@InjectMocks
 	private TriagemService triagemService;
@@ -98,7 +107,7 @@ class TriagemServiceTest {
 		assertThat(triagem.getCorConfirmada()).isEqualTo(CorRisco.LARANJA);
 		assertThat(triagem.getCorSugerida()).isEqualTo(CorRisco.AMARELO);
 		assertThat(triagem.getConfirmador()).isSameAs(enfermeiro);
-		assertThat(triagem.getConfirmadaEm()).isNotNull();
+		assertThat(triagem.getConfirmadaEm()).isEqualTo(AGORA);
 	}
 
 	@Test

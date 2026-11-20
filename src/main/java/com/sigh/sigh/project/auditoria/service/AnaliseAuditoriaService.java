@@ -15,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -25,6 +26,7 @@ public class AnaliseAuditoriaService {
 	private final AnaliseAuditoriaRepository analiseAuditoriaRepository;
 	private final RegistroAuditoriaRepository registroAuditoriaRepository;
 	private final UsuarioService usuarioService;
+	private final Clock clock;
 
 	@Transactional
 	public AnaliseAuditoriaResponseDTO registrar(UUID registroAuditoriaId, AnaliseAuditoriaRequestDTO dados,
@@ -36,7 +38,7 @@ public class AnaliseAuditoriaService {
 		analise.setTipo(dados.tipo());
 		analise.setConclusao(dados.conclusao());
 		analise.setDescricao(dados.descricao());
-		analise.setRegistradaEm(LocalDateTime.now());
+		analise.setRegistradaEm(LocalDateTime.now(clock));
 		analise.setAuditor(usuarioService.buscarPorLogin(loginAuditor));
 		return AnaliseAuditoriaResponseDTO.de(analiseAuditoriaRepository.save(analise));
 	}
