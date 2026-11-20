@@ -25,11 +25,15 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 class ClienteIATest {
 
-	private static final String ENDERECO_IA = "http://ia.teste";
+	// Endereços diferentes só para o teste saber qual cliente fez o pedido: o da triagem tem o tempo-limite
+	// curto, e o do resumo, o longo.
+	private static final String ENDERECO_IA = "http://ia.triagem";
+	private static final String ENDERECO_IA_RESUMO = "http://ia.resumo";
 	private static final IAProperties CONFIGURACAO = new IAProperties(
 			ENDERECO_IA, "modelo-teste", null, 0, Duration.ofSeconds(5), 20,
 			new ByteArrayResource("Instruções de triagem".getBytes(StandardCharsets.UTF_8)),
-			new ByteArrayResource("Instruções de resumo".getBytes(StandardCharsets.UTF_8)));
+			new ByteArrayResource("Instruções de resumo".getBytes(StandardCharsets.UTF_8)),
+			Duration.ofSeconds(10), 5, false);
 
 	private MockRestServiceServer servidorIA;
 	private ClienteIA clienteIA;
@@ -38,7 +42,9 @@ class ClienteIATest {
 	public void prepararServidorSimulado() throws Exception {
 		RestClient.Builder construtor = RestClient.builder();
 		servidorIA = MockRestServiceServer.bindTo(construtor).build();
-		clienteIA = new ClienteIA(construtor.baseUrl(ENDERECO_IA).build(), CONFIGURACAO, JsonMapper.builder().build());
+		RestClient clienteTriagem = construtor.baseUrl(ENDERECO_IA).build();
+		RestClient clienteResumo = construtor.baseUrl(ENDERECO_IA_RESUMO).build();
+		clienteIA = new ClienteIA(clienteTriagem, clienteResumo, CONFIGURACAO, JsonMapper.builder().build());
 	}
 
 	@Test
@@ -87,7 +93,7 @@ class ClienteIATest {
 
 	@Test
 	void resumoEhPedidoEmTextoLivreComAsInstrucoesDeResumo() {
-		servidorIA.expect(requestTo(ENDERECO_IA + "/v1/chat/completions"))
+		servidorIA.expect(requestTo(ENDERECO_IA_RESUMO + "/v1/chat/completions"))
 				.andExpect(jsonPath("$.messages[0].content").value("Instruções de resumo"))
 				.andExpect(jsonPath("$.messages[1].content").value("- 2026-09-20 | Hospital | ALERGIA: dipirona"))
 				.andExpect(jsonPath("$.response_format").doesNotExist())
@@ -99,8 +105,20 @@ class ClienteIATest {
 	}
 
 	@Test
+	void aquecimentoPedeUmaRespostaMinimaPeloClienteDoResumo() {
+		servidorIA.expect(requestTo(ENDERECO_IA_RESUMO + "/v1/chat/completions"))
+				.andExpect(jsonPath("$.model").value("modelo-teste"))
+				.andExpect(jsonPath("$.messages[0].content").value("Responda apenas: ok"))
+				.andRespond(withSuccess(respostaComConteudo("ok"), MediaType.APPLICATION_JSON));
+
+		clienteIA.aquecer();
+
+		servidorIA.verify();
+	}
+
+	@Test
 	void resumoVazioEhRecusado() {
-		servidorIA.expect(requestTo(ENDERECO_IA + "/v1/chat/completions"))
+		servidorIA.expect(requestTo(ENDERECO_IA_RESUMO + "/v1/chat/completions"))
 				.andRespond(withSuccess(respostaComConteudo(" "), MediaType.APPLICATION_JSON));
 
 		assertThatThrownBy(() -> clienteIA.resumirHistorico("- registro"))
