@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.UUID;
@@ -27,6 +28,7 @@ public class RegistroAuditoriaService {
 	private final InstituicaoRepository instituicaoRepository;
 	private final RegistroClinicoRepository registroClinicoRepository;
 	private final UsuarioService usuarioService;
+	private final Clock clock;
 
 	@Transactional
 	public void registrarAcesso(AcessoProntuarioDTO acesso) {
@@ -38,7 +40,7 @@ public class RegistroAuditoriaService {
 		registro.setAtor(usuarioService.buscarPorLogin(acesso.loginAtor()));
 		registro.setPerfil(acesso.perfil());
 		registro.setInstituicao(instituicaoRepository.getReferenceById(acesso.instituicaoId()));
-		registro.setOcorridoEm(LocalDateTime.now());
+		registro.setOcorridoEm(LocalDateTime.now(clock));
 		registro.setFinalidadeDeclarada(acesso.finalidade());
 		registro.setEmergencia(acesso.emergencia());
 		registro.setJustificativa(acesso.justificativa());

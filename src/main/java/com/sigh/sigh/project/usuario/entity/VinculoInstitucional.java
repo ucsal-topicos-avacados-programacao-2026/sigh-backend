@@ -36,7 +36,7 @@ public class VinculoInstitucional {
 	private LocalDateTime inicioEm;
 	private LocalDateTime fimEm;
 
-	public boolean estaAtivo() {
-		return fimEm == null || fimEm.isAfter(LocalDateTime.now());
+	public boolean estaAtivo(LocalDateTime agora) {
+		return fimEm == null || fimEm.isAfter(agora);
 	}
 }

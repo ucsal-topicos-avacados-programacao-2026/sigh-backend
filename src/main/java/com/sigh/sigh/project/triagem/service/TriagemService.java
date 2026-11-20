@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.Set;
@@ -34,6 +35,7 @@ public class TriagemService {
 	private final AtendimentoRepository atendimentoRepository;
 	private final RegistroClinicoRepository registroClinicoRepository;
 	private final UsuarioService usuarioService;
+	private final Clock clock;
 
 	@Transactional
 	public TriagemResponseDTO registrar(TriagemRequestDTO dados, String loginEnfermeiro) {
@@ -63,7 +65,7 @@ public class TriagemService {
 	public TriagemResponseDTO confirmarRisco(UUID triagemId, CorRisco cor, String loginEnfermeiro) {
 		Triagem triagem = buscarTriagemNaoConfirmada(triagemId);
 		triagem.setCorConfirmada(cor);
-		triagem.setConfirmadaEm(LocalDateTime.now());
+		triagem.setConfirmadaEm(LocalDateTime.now(clock));
 		triagem.setConfirmador(usuarioService.buscarPorLogin(loginEnfermeiro));
 		return TriagemResponseDTO.de(triagem);
 	}
