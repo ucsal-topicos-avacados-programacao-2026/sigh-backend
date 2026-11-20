@@ -72,6 +72,32 @@ public interface RegistroAuditoriaRepository extends JpaRepository<RegistroAudit
 	Page<RegistroAuditoria> buscarRegistrosDoPeriodo(UUID instituicaoId, Boolean emergencia,
 			LocalDateTime inicio, LocalDateTime fim, Pageable paginacao);
 
+	/**
+	 * Fila obrigatória do auditor (BE-18): acessos de emergência que ainda não têm análise conclusiva,
+	 * do mais antigo para o mais novo. O DTO é montado depois da consulta (a justificativa é cifrada).
+	 */
+	default Page<RegistroAuditoriaResponseDTO> buscarEmergenciasSemAnalise(Pageable paginacao) {
+		return buscarEmergenciasPendentes(paginacao).map(RegistroAuditoriaResponseDTO::de);
+	}
+
+	@Query(value = """
+			select r from RegistroAuditoria r
+			join fetch r.ator ator
+			left join fetch r.instituicao instituicao
+			where r.emergencia = true
+			and not exists (
+				select 1 from AnaliseAuditoria a where a.registroAuditoria = r
+				and a.conclusao <> com.sigh.sigh.project.auditoria.entity.ConclusaoAnalise.PENDENTE)
+			order by r.ocorridoEm, r.id
+			""", countQuery = """
+			select count(r) from RegistroAuditoria r
+			where r.emergencia = true
+			and not exists (
+				select 1 from AnaliseAuditoria a where a.registroAuditoria = r
+				and a.conclusao <> com.sigh.sigh.project.auditoria.entity.ConclusaoAnalise.PENDENTE)
+			""")
+	Page<RegistroAuditoria> buscarEmergenciasPendentes(Pageable paginacao);
+
 	@Query("""
 			select new com.sigh.sigh.project.auditoria.dto.IndicadorInstituicaoDTO(
 				instituicao.id, instituicao.nome, count(r),

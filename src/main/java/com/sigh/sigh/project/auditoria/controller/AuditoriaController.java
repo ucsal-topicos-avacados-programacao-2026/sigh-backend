@@ -38,6 +38,16 @@ public class AuditoriaController {
 		return new PagedModel<>(consultaAuditoriaService.consultarRegistros(filtro, paginacao));
 	}
 
+	/**
+	 * Fila obrigatória dos acessos de emergência (BE-18): cada um sai dela quando o auditor registra uma
+	 * análise conclusiva (regular, indevido ou inconclusivo) em POST /auditoria/registros/{id}/analises.
+	 */
+	@GetMapping("/emergencias/pendentes")
+	@PreAuthorize("hasRole('AUDITOR_GESTOR')")
+	public PagedModel<RegistroAuditoriaResponseDTO> consultarEmergenciasPendentes(Pageable paginacao) {
+		return new PagedModel<>(consultaAuditoriaService.consultarEmergenciasPendentes(paginacao));
+	}
+
 	@GetMapping("/indicadores")
 	@PreAuthorize("hasRole('AUDITOR_GESTOR')")
 	public List<IndicadorInstituicaoDTO> consultarIndicadores(@Valid PeriodoDTO periodo) {

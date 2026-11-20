@@ -27,6 +27,17 @@ O último caso é o controle positivo: como a única diferença entre eles é o 
 - a regra de acesso não é `hasRole` ou `hasAnyRole`, que são as que ele sabe ler;
 - a rota não declara o método HTTP.
 
+## Acesso de emergência (RF-010, RF-011)
+
+Em emergência, médico ou enfermeiro com vínculo no hospital do atendimento vê também o que o paciente restringiu (`POST /atendimentos/{id}/historico/emergencia`). Antes de qualquer dado aparecer, a justificativa (mínimo de 20 caracteres) é gravada na auditoria, e o paciente vê o acesso marcado como emergência.
+
+**Controles contra abuso (BE-18).** São três, decididos pelo grupo em 20/11/2026:
+1. **Gravidade:** só vale se a classificação de risco confirmada mais recente do atendimento for vermelha ou laranja. Se o paciente melhorar e for reclassificado, perde a emergência. Se piorar de novo, recupera. Isso só vale enquanto a reclassificação é possível: hoje, a triagem só é aceita antes de o médico começar o atendimento. Um paciente vermelho há mais de 12 horas em atendimento, ou um atendimento que nunca passou por triagem, fica sem acesso de emergência. A regra de triagem durante o atendimento está no card BE-24.
+2. **Janela:** só vale até 12 horas depois dessa classificação (`sigh.emergencia.janela`).
+3. **Revisão obrigatória:** todo acesso de emergência entra na fila do auditor (`GET /auditoria/emergencias/pendentes`, do mais antigo para o mais novo). Ele só sai dela quando o auditor registra uma análise conclusiva (regular, indevido ou inconclusivo) em `POST /auditoria/registros/{id}/analises`, seja um parecer ou um alerta. Uma análise "pendente" não o tira da fila.
+
+Não há teto de acessos por profissional: um teto poderia bloquear uma emergência de verdade. As tentativas recusadas (sem classificação grave ou fora da janela) não ficam na auditoria. O auditor também vê os indicadores por instituição. Os controles estão provados em `EmergenciaControladaTest`.
+
 ## Segurança dos dados (RNF-004, RNF-007)
 
 ### Onde o dado clínico é decifrado
