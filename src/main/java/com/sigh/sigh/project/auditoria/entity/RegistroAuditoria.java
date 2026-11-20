@@ -1,11 +1,13 @@
 package com.sigh.sigh.project.auditoria.entity;
 
+import com.sigh.sigh.project.comum.cripto.TextoCifrado;
 import com.sigh.sigh.project.instituicao.entity.Instituicao;
 import com.sigh.sigh.project.prontuario.entity.Prontuario;
 import com.sigh.sigh.project.prontuario.entity.RegistroClinico;
 import com.sigh.sigh.project.usuario.entity.Perfil;
 import com.sigh.sigh.project.usuario.entity.Usuario;
 import jakarta.persistence.*;
+import jakarta.persistence.Convert;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.Immutable;
@@ -41,6 +43,7 @@ public class RegistroAuditoria {
 	private LocalDateTime ocorridoEm;
 	private String finalidadeDeclarada;
 	private boolean emergencia;
+	@Convert(converter = TextoCifrado.class)
 	private String justificativa;
 
 	@ManyToMany
