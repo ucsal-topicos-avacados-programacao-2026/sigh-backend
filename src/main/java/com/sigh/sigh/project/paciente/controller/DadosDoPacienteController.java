@@ -1,5 +1,7 @@
 package com.sigh.sigh.project.paciente.controller;
 
+import com.sigh.sigh.project.auditoria.dto.AcessoDoPacienteDTO;
+import com.sigh.sigh.project.auditoria.service.ConsultaAuditoriaService;
 import com.sigh.sigh.project.paciente.dto.AlvoDaRestricaoRequest;
 import com.sigh.sigh.project.paciente.dto.AutorizacaoAdicionalRequest;
 import com.sigh.sigh.project.paciente.dto.AutorizacaoAdicionalResponse;
@@ -16,6 +18,8 @@ import com.sigh.sigh.project.paciente.service.TitularidadeService;
 import com.sigh.sigh.project.prontuario.dto.RegistroDoHistoricoDTO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PagedModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -45,6 +49,7 @@ public class DadosDoPacienteController {
 	private final ConsentimentoService consentimentoService;
 	private final RestricaoService restricaoService;
 	private final AutorizacaoAdicionalService autorizacaoAdicionalService;
+	private final ConsultaAuditoriaService consultaAuditoriaService;
 
 	/** Pacientes que o usuário gerencia: o próprio cadastro e os representados. */
 	@GetMapping("/gerenciados")
@@ -55,6 +60,12 @@ public class DadosDoPacienteController {
 	@GetMapping("/{pacienteId}/historico")
 	public List<RegistroDoHistoricoDTO> historico(@PathVariable UUID pacienteId, Principal usuario) {
 		return historicoDoPacienteService.consultar(pacienteId, usuario.getName());
+	}
+
+	/** Quem acessou o prontuário (RF-008), também para o representante legal (BE-19). */
+	@GetMapping("/{pacienteId}/acessos")
+	public PagedModel<AcessoDoPacienteDTO> acessos(@PathVariable UUID pacienteId, Pageable paginacao, Principal usuario) {
+		return new PagedModel<>(consultaAuditoriaService.consultarAcessosDoPaciente(pacienteId, usuario.getName(), paginacao));
 	}
 
 	@GetMapping("/{pacienteId}/consentimentos")
