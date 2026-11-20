@@ -12,7 +12,9 @@ import com.sigh.sigh.project.triagem.dto.TriagemResponseDTO;
 import com.sigh.sigh.project.triagem.entity.CorRisco;
 import com.sigh.sigh.project.triagem.entity.Triagem;
 import com.sigh.sigh.project.triagem.repository.TriagemRepository;
+import com.sigh.sigh.project.usuario.entity.Perfil;
 import com.sigh.sigh.project.usuario.service.UsuarioService;
+import com.sigh.sigh.project.usuario.service.VinculoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,11 +38,13 @@ public class TriagemService {
 	private final RegistroClinicoRepository registroClinicoRepository;
 	private final UsuarioService usuarioService;
 	private final Clock clock;
+	private final VinculoService vinculoService;
 
 	@Transactional
 	public TriagemResponseDTO registrar(TriagemRequestDTO dados, String loginEnfermeiro) {
 		Atendimento atendimento = atendimentoRepository.findById(dados.atendimentoId())
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Atendimento não encontrado."));
+		vinculoService.exigirVinculoAtivo(loginEnfermeiro, atendimento.getInstituicao().getId(), Perfil.ENFERMEIRO);
 		if (!STATUS_QUE_ACEITAM_TRIAGEM.contains(atendimento.getStatus())) {
 			throw new RegraNegocioException("Só é possível triar atendimentos abertos ou em triagem.");
 		}
@@ -63,7 +67,11 @@ public class TriagemService {
 
 	@Transactional
 	public TriagemResponseDTO confirmarRisco(UUID triagemId, CorRisco cor, String loginEnfermeiro) {
-		Triagem triagem = buscarTriagemNaoConfirmada(triagemId);
+		Triagem triagem = triagemRepository.findById(triagemId)
+				.orElseThrow(() -> new RecursoNaoEncontradoException("Triagem não encontrada."));
+		vinculoService.exigirVinculoAtivo(loginEnfermeiro, triagem.getAtendimento().getInstituicao().getId(),
+				Perfil.ENFERMEIRO);
+		triagem = buscarTriagemNaoConfirmada(triagemId);
 		triagem.setCorConfirmada(cor);
 		triagem.setConfirmadaEm(LocalDateTime.now(clock));
 		triagem.setConfirmador(usuarioService.buscarPorLogin(loginEnfermeiro));

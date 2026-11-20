@@ -56,7 +56,8 @@ public class TriagemController {
 
 	@GetMapping("/fila")
 	@PreAuthorize("hasAnyRole('ENFERMEIRO', 'MEDICO')")
-	public PagedModel<PacienteNaFilaDTO> consultarFila(@RequestParam UUID instituicaoId, Pageable paginacao) {
-		return new PagedModel<>(filaAtendimentoService.consultarFila(instituicaoId, paginacao));
+	public PagedModel<PacienteNaFilaDTO> consultarFila(@RequestParam UUID instituicaoId, Pageable paginacao,
+			Principal usuario) {
+		return new PagedModel<>(filaAtendimentoService.consultarFila(instituicaoId, usuario.getName(), paginacao));
 	}
 }

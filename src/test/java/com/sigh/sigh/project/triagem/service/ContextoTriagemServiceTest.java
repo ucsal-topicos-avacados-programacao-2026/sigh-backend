@@ -14,6 +14,7 @@ import com.sigh.sigh.project.triagem.entity.SinaisVitais;
 import com.sigh.sigh.project.triagem.entity.Triagem;
 import com.sigh.sigh.project.triagem.repository.TriagemRepository;
 import com.sigh.sigh.project.usuario.entity.Perfil;
+import com.sigh.sigh.project.usuario.service.VinculoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,14 +51,20 @@ class ContextoTriagemServiceTest {
 
 	private Triagem triagem;
 
+	@Mock
+	private VinculoService vinculoService;
+
 	@BeforeEach
 	public void prepararTriagem() {
 		IAProperties configuracao = new IAProperties("http://ia.teste", "modelo-teste", null, 0,
 				Duration.ofSeconds(5), 20, new ByteArrayResource(new byte[0]), new ByteArrayResource(new byte[0]));
-		contextoTriagemService = new ContextoTriagemService(triagemRepository, historicoAutorizadoService, configuracao);
+		contextoTriagemService = new ContextoTriagemService(triagemRepository, historicoAutorizadoService, configuracao,
+				vinculoService);
 		triagem = new Triagem();
 		triagem.setId(UUID.randomUUID());
-		triagem.setAtendimento(new Atendimento());
+		Atendimento atendimento = new Atendimento();
+		atendimento.setInstituicao(new Instituicao());
+		triagem.setAtendimento(atendimento);
 		triagem.setSintomas("Dor no peito");
 		triagem.setSinaisVitais(new SinaisVitais());
 		when(triagemRepository.findById(triagem.getId())).thenReturn(Optional.of(triagem));

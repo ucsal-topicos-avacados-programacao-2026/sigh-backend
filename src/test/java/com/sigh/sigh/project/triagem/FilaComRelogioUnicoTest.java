@@ -45,7 +45,7 @@ class FilaComRelogioUnicoTest extends TesteIntegracao {
 	@Test
 	void tempoDeEsperaDaFilaUsaOMesmoRelogioDaChegada() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
-		String enfermeiro = cenario.usuario(Perfil.ENFERMEIRO).getLogin();
+		String enfermeiro = cenario.vinculo(hospital, Perfil.ENFERMEIRO, LocalDateTime.of(2026, 1, 1, 0, 0), null);
 		UUID atendimentoId = admitir(hospital);
 
 		TriagemResponseDTO triagem = triagemService.registrar(new TriagemRequestDTO(atendimentoId, "Febre e tosse",
@@ -55,14 +55,14 @@ class FilaComRelogioUnicoTest extends TesteIntegracao {
 		assertThat(confirmada.confirmadaEm()).isEqualTo(LocalDateTime.of(2026, 11, 10, 12, 5));
 
 		relogio.avancar(Duration.ofMinutes(25));
-		PacienteNaFilaDTO noPrazo = naFila(hospital, atendimentoId);
+		PacienteNaFilaDTO noPrazo = naFila(hospital, atendimentoId, enfermeiro);
 		assertThat(noPrazo.chegadaEm()).isEqualTo(LocalDateTime.of(2026, 11, 10, 12, 0));
 		assertThat(noPrazo.minutosDeEspera()).isEqualTo(30);
 		assertThat(noPrazo.tempoMaximoExcedido()).isFalse();
 
 		// Amarelo tolera 60 minutos (application.properties).
 		relogio.avancar(Duration.ofMinutes(31));
-		PacienteNaFilaDTO atrasado = naFila(hospital, atendimentoId);
+		PacienteNaFilaDTO atrasado = naFila(hospital, atendimentoId, enfermeiro);
 		assertThat(atrasado.minutosDeEspera()).isEqualTo(61);
 		assertThat(atrasado.tempoMaximoExcedido()).isTrue();
 	}
@@ -79,8 +79,8 @@ class FilaComRelogioUnicoTest extends TesteIntegracao {
 		return UUID.fromString(JsonPath.read(resultado.getResponse().getContentAsString(), "$.atendimentoId"));
 	}
 
-	private PacienteNaFilaDTO naFila(Instituicao hospital, UUID atendimentoId) {
-		List<PacienteNaFilaDTO> fila = filaAtendimentoService.consultarFila(hospital.getId(), Pageable.unpaged())
+	private PacienteNaFilaDTO naFila(Instituicao hospital, UUID atendimentoId, String enfermeiro) {
+		List<PacienteNaFilaDTO> fila = filaAtendimentoService.consultarFila(hospital.getId(), enfermeiro, Pageable.unpaged())
 				.getContent();
 		assertThat(fila).extracting(PacienteNaFilaDTO::atendimentoId).containsExactly(atendimentoId);
 		return fila.getFirst();

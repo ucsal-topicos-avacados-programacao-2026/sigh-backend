@@ -10,6 +10,7 @@ import com.sigh.sigh.project.triagem.dto.CasoTriagemDTO;
 import com.sigh.sigh.project.triagem.entity.Triagem;
 import com.sigh.sigh.project.triagem.repository.TriagemRepository;
 import com.sigh.sigh.project.usuario.entity.Perfil;
+import com.sigh.sigh.project.usuario.service.VinculoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,11 +29,14 @@ public class ContextoTriagemService {
 	private final TriagemRepository triagemRepository;
 	private final HistoricoAutorizadoService historicoAutorizadoService;
 	private final IAProperties iaProperties;
+	private final VinculoService vinculoService;
 
 	@Transactional
 	public CasoTriagemDTO montarCaso(UUID triagemId, String loginEnfermeiro) {
 		Triagem triagem = triagemRepository.findById(triagemId)
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Triagem não encontrada."));
+		vinculoService.exigirVinculoAtivo(loginEnfermeiro, triagem.getAtendimento().getInstituicao().getId(),
+				Perfil.ENFERMEIRO);
 		if (triagem.getCorConfirmada() != null) {
 			throw new RegraNegocioException("A classificação desta triagem já foi confirmada.");
 		}

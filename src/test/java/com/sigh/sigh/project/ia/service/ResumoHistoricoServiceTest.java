@@ -6,12 +6,14 @@ import com.sigh.sigh.project.ia.config.IAProperties;
 import com.sigh.sigh.project.ia.entity.ResumoHistoricoIA;
 import com.sigh.sigh.project.ia.entity.StatusResumo;
 import com.sigh.sigh.project.ia.repository.ResumoHistoricoIARepository;
+import com.sigh.sigh.project.instituicao.entity.Instituicao;
 import com.sigh.sigh.project.prontuario.entity.Atendimento;
 import com.sigh.sigh.project.prontuario.repository.AtendimentoRepository;
 import com.sigh.sigh.project.prontuario.service.HistoricoAutorizadoService;
 import com.sigh.sigh.project.support.RelogioDeTeste;
 import com.sigh.sigh.project.usuario.entity.Usuario;
 import com.sigh.sigh.project.usuario.service.UsuarioService;
+import com.sigh.sigh.project.usuario.service.VinculoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,6 +56,9 @@ class ResumoHistoricoServiceTest {
 	@Mock
 	private UsuarioService usuarioService;
 
+	@Mock
+	private VinculoService vinculoService;
+
 	private ResumoHistoricoService resumoHistoricoService;
 
 	@BeforeEach
@@ -62,13 +67,14 @@ class ResumoHistoricoServiceTest {
 				Duration.ofSeconds(5), 20, new ByteArrayResource(new byte[0]), new ByteArrayResource(new byte[0]));
 		resumoHistoricoService = new ResumoHistoricoService(resumoHistoricoIARepository, atendimentoRepository,
 				historicoAutorizadoService, registroAuditoriaService, usuarioService, configuracao,
-				RelogioDeTeste.em(AGORA));
+				RelogioDeTeste.em(AGORA), vinculoService);
 	}
 
 	@Test
 	void semHistoricoAutorizadoNaoChamaAIA() {
 		Atendimento atendimento = new Atendimento();
 		atendimento.setId(UUID.randomUUID());
+		atendimento.setInstituicao(new Instituicao());
 		when(atendimentoRepository.findById(atendimento.getId())).thenReturn(Optional.of(atendimento));
 		when(historicoAutorizadoService.consultar(any(), any())).thenReturn(List.of());
 
@@ -113,6 +119,7 @@ class ResumoHistoricoServiceTest {
 	private ResumoHistoricoIA resumoComStatus(StatusResumo status) {
 		Atendimento atendimento = new Atendimento();
 		atendimento.setId(UUID.randomUUID());
+		atendimento.setInstituicao(new Instituicao());
 		ResumoHistoricoIA resumo = new ResumoHistoricoIA();
 		resumo.setId(UUID.randomUUID());
 		resumo.setAtendimento(atendimento);
