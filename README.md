@@ -10,6 +10,23 @@ Os testes usam PostgreSQL: os de repositório e o `AutenticacaoIntegracaoTest` u
 DB_PASSWORD=... ./mvnw verify
 ```
 
+## Vínculo com a instituição (RF-012)
+
+Médico, enfermeiro e administrativo só operam sobre dados da instituição em que têm vínculo ativo com aquele perfil. A checagem fica em cada serviço, em geral via `VinculoService`.
+
+O `VinculoEmTodaRotaTest` lê as rotas do próprio Spring e garante que nenhuma escape. Para cada rota com perfil de médico, enfermeiro ou administrativo, e para cada um desses perfis que ela aceita, ele confere três usuários:
+- sem vínculo nenhum: recebe 403;
+- com vínculo só em outra instituição: recebe 403;
+- com vínculo na instituição dos dados, mas encerrado ou com outro perfil: recebe 403;
+- com vínculo na instituição dos dados: a mesma requisição não é recusada (nem 401 nem 403).
+
+O último caso é o controle positivo: como a única diferença entre eles é o vínculo, o 403 vem da checagem de vínculo. O teste também confere que cada requisição cai na rota do caso.
+
+**Rota nova:** o teste falha até a rota ganhar um caso em `casos()`. O caso só passa se o serviço checar o vínculo. Se a rota não deve exigir vínculo, justifique em `SEM_VINCULO`. Hoje a única exceção é a busca de leitos (`GET /leitos`): ela é aberta à rede para ver vagas em transferências e não traz dado de paciente. O teste também falha quando:
+- alguma rota fica sem `@PreAuthorize`, salvo as de autenticação;
+- a regra de acesso não é `hasRole` ou `hasAnyRole`, que são as que ele sabe ler;
+- a rota não declara o método HTTP.
+
 ## Segurança dos dados (RNF-004, RNF-007)
 
 ### Onde o dado clínico é decifrado
