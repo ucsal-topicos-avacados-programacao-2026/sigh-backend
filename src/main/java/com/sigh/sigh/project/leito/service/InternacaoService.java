@@ -17,6 +17,8 @@ import com.sigh.sigh.project.prontuario.entity.RegistroClinico;
 import com.sigh.sigh.project.prontuario.entity.TipoRegistro;
 import com.sigh.sigh.project.prontuario.repository.AtendimentoRepository;
 import com.sigh.sigh.project.prontuario.repository.RegistroClinicoRepository;
+import com.sigh.sigh.project.usuario.entity.Perfil;
+import com.sigh.sigh.project.usuario.service.VinculoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,15 +37,20 @@ public class InternacaoService {
 	private final AtendimentoRepository atendimentoRepository;
 	private final RegistroClinicoRepository registroClinicoRepository;
 	private final Clock clock;
+	private final VinculoService vinculoService;
 
 	@Transactional
-	public InternacaoResponseDTO internar(InternacaoRequestDTO dados) {
+	public InternacaoResponseDTO internar(InternacaoRequestDTO dados, String login) {
 		Atendimento atendimento = atendimentoRepository.findById(dados.atendimentoId())
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Atendimento não encontrado."));
+		vinculoService.exigirVinculoAtivo(login, atendimento.getInstituicao().getId(), Perfil.ADMINISTRATIVO);
 		if (internacaoRepository.existsByProntuarioIdAndAltaEmIsNull(atendimento.getProntuario().getId())) {
 			throw new RegraNegocioException("O paciente já está internado.");
 		}
 		Leito leito = buscarLeitoLivre(dados.leitoId());
+		if (!leito.getInstituicao().getId().equals(atendimento.getInstituicao().getId())) {
+			throw new RegraNegocioException("O leito pertence a outra instituição.");
+		}
 		Internacao internacao = new Internacao();
 		internacao.setProntuario(atendimento.getProntuario());
 		internacao.setAtendimentoOrigem(atendimento);
@@ -54,8 +61,8 @@ public class InternacaoService {
 	}
 
 	@Transactional
-	public InternacaoResponseDTO transferir(UUID internacaoId, UUID leitoDestinoId) {
-		Internacao internacao = buscarInternacaoAberta(internacaoId);
+	public InternacaoResponseDTO transferir(UUID internacaoId, UUID leitoDestinoId, String login) {
+		Internacao internacao = buscarInternacaoAberta(internacaoId, login);
 		Leito destino = buscarLeitoLivre(leitoDestinoId);
 		desocuparLeitoAtual(internacao);
 		ocupar(destino, internacao, MotivoOcupacao.TRANSFERENCIA);
@@ -63,8 +70,8 @@ public class InternacaoService {
 	}
 
 	@Transactional
-	public InternacaoResponseDTO darAlta(UUID internacaoId, UUID resumoAltaId) {
-		Internacao internacao = buscarInternacaoAberta(internacaoId);
+	public InternacaoResponseDTO darAlta(UUID internacaoId, UUID resumoAltaId, String login) {
+		Internacao internacao = buscarInternacaoAberta(internacaoId, login);
 		RegistroClinico resumoAlta = buscarResumoAlta(resumoAltaId, internacao);
 		Leito leito = desocuparLeitoAtual(internacao);
 		internacao.setAltaEm(LocalDateTime.now(clock));
@@ -72,9 +79,13 @@ public class InternacaoService {
 		return InternacaoResponseDTO.de(internacao, leito);
 	}
 
-	private Internacao buscarInternacaoAberta(UUID internacaoId) {
+	/** Transferência e alta exigem vínculo com a instituição onde o paciente está internado agora. */
+	private Internacao buscarInternacaoAberta(UUID internacaoId, String login) {
 		Internacao internacao = internacaoRepository.findById(internacaoId)
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Internação não encontrada."));
+		UUID instituicaoAtual = ocupacaoLeitoRepository.instituicaoDaOcupacaoAtual(internacao.getId())
+				.orElseGet(() -> internacao.getAtendimentoOrigem().getInstituicao().getId());
+		vinculoService.exigirVinculoAtivo(login, instituicaoAtual, Perfil.ADMINISTRATIVO);
 		if (internacao.getAltaEm() != null) {
 			throw new RegraNegocioException("A internação já foi encerrada.");
 		}

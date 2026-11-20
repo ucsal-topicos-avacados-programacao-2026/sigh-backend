@@ -1,9 +1,14 @@
 package com.sigh.sigh.project.usuario;
 
 import com.jayway.jsonpath.JsonPath;
+import com.sigh.sigh.project.instituicao.entity.Instituicao;
+import com.sigh.sigh.project.instituicao.entity.TipoInstituicao;
+import com.sigh.sigh.project.instituicao.repository.InstituicaoRepository;
 import com.sigh.sigh.project.usuario.entity.Perfil;
 import com.sigh.sigh.project.usuario.entity.Usuario;
+import com.sigh.sigh.project.usuario.entity.VinculoInstitucional;
 import com.sigh.sigh.project.usuario.repository.UsuarioRepository;
+import com.sigh.sigh.project.usuario.repository.VinculoInstitucionalRepository;
 import dev.samstevens.totp.code.DefaultCodeGenerator;
 import dev.samstevens.totp.secret.SecretGenerator;
 import dev.samstevens.totp.time.SystemTimeProvider;
@@ -18,6 +23,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -40,6 +47,12 @@ class AutenticacaoIntegracaoTest {
 
 	@Autowired
 	private UsuarioRepository usuarioRepository;
+
+	@Autowired
+	private InstituicaoRepository instituicaoRepository;
+
+	@Autowired
+	private VinculoInstitucionalRepository vinculoRepository;
 
 	@Autowired
 	private PasswordEncoder codificadorDeSenha;
@@ -74,18 +87,21 @@ class AutenticacaoIntegracaoTest {
 	@Test
 	void medicoSoAcessaDepoisDeValidarOSegundoFator() throws Exception {
 		String segredo = geradorDeSegredo.generate();
-		salvarUsuario("medico.teste", Perfil.MEDICO, segredo);
+		Usuario medico = salvarUsuario("medico.teste", Perfil.MEDICO, segredo);
+		UUID hospital = vincular(medico, Perfil.MEDICO);
 		String tokenPendente = entrar("medico.teste", SENHA)
 				.andExpect(jsonPath("$.etapa").value("VALIDAR_SEGUNDO_FATOR"))
 				.andReturn().getResponse().getContentAsString();
 
-		consultarFila(tokenPendente).andExpect(status().isForbidden());
+		consultarFila(tokenPendente, hospital).andExpect(status().isForbidden());
 
 		String tokenDeAcesso = validarSegundoFator(tokenPendente, codigoAtual(segredo))
 				.andExpect(jsonPath("$.etapa").value("ACESSO_LIBERADO"))
 				.andReturn().getResponse().getContentAsString();
 
-		consultarFila(tokenDeAcesso).andExpect(status().isOk());
+		consultarFila(tokenDeAcesso, hospital).andExpect(status().isOk());
+		// BE-13: com o segundo fator validado, outra instituição continua fechada sem vínculo.
+		consultarFila(tokenDeAcesso, UUID.randomUUID()).andExpect(status().isForbidden());
 		mockMvc.perform(get("/leitos").header(HttpHeaders.AUTHORIZATION, bearer(tokenDeAcesso)))
 				.andExpect(status().isForbidden());
 	}
@@ -130,9 +146,9 @@ class AutenticacaoIntegracaoTest {
 						""".formatted(codigo)));
 	}
 
-	private ResultActions consultarFila(String respostaComToken) throws Exception {
+	private ResultActions consultarFila(String respostaComToken, UUID instituicaoId) throws Exception {
 		return mockMvc.perform(get("/triagens/fila")
-				.param("instituicaoId", UUID.randomUUID().toString())
+				.param("instituicaoId", instituicaoId.toString())
 				.header(HttpHeaders.AUTHORIZATION, bearer(respostaComToken)));
 	}
 
@@ -146,7 +162,23 @@ class AutenticacaoIntegracaoTest {
 		return new DefaultCodeGenerator().generate(segredo, intervaloAtual);
 	}
 
-	private void salvarUsuario(String login, Perfil perfil, String segredoDoSegundoFator) {
+	/** Vínculo ativo com uma instituição nova (BE-13); devolve o id da instituição. */
+	private UUID vincular(Usuario usuario, Perfil perfil) {
+		Instituicao instituicao = new Instituicao();
+		instituicao.setNome("Hospital Fictício");
+		instituicao.setTipo(TipoInstituicao.PUBLICA);
+		instituicao.setCredenciada(true);
+		instituicaoRepository.save(instituicao);
+		VinculoInstitucional vinculo = new VinculoInstitucional();
+		vinculo.setUsuario(usuario);
+		vinculo.setInstituicao(instituicao);
+		vinculo.setPerfisHabilitados(new HashSet<>(Set.of(perfil)));
+		vinculo.setInicioEm(LocalDateTime.of(2020, 1, 1, 0, 0));
+		vinculoRepository.save(vinculo);
+		return instituicao.getId();
+	}
+
+	private Usuario salvarUsuario(String login, Perfil perfil, String segredoDoSegundoFator) {
 		Usuario usuario = new Usuario();
 		usuario.setLogin(login);
 		usuario.setNome("Usuário Fictício");
@@ -154,6 +186,6 @@ class AutenticacaoIntegracaoTest {
 		usuario.setPerfis(Set.of(perfil));
 		usuario.setMfaSegredo(segredoDoSegundoFator);
 		usuario.setMfaHabilitado(segredoDoSegundoFator != null);
-		usuarioRepository.save(usuario);
+		return usuarioRepository.save(usuario);
 	}
 }

@@ -1,6 +1,7 @@
 package com.sigh.sigh.project.triagem.service;
 
 import com.sigh.sigh.project.comum.erro.RegraNegocioException;
+import com.sigh.sigh.project.instituicao.entity.Instituicao;
 import com.sigh.sigh.project.prontuario.entity.Atendimento;
 import com.sigh.sigh.project.prontuario.entity.StatusAtendimento;
 import com.sigh.sigh.project.prontuario.repository.AtendimentoRepository;
@@ -13,6 +14,7 @@ import com.sigh.sigh.project.triagem.entity.Triagem;
 import com.sigh.sigh.project.triagem.repository.TriagemRepository;
 import com.sigh.sigh.project.usuario.entity.Usuario;
 import com.sigh.sigh.project.usuario.service.UsuarioService;
+import com.sigh.sigh.project.usuario.service.VinculoService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -53,6 +55,9 @@ class TriagemServiceTest {
 
 	@Spy
 	private Clock clock = RelogioDeTeste.em(AGORA);
+
+	@Mock
+	private VinculoService vinculoService;
 
 	@InjectMocks
 	private TriagemService triagemService;
@@ -125,6 +130,7 @@ class TriagemServiceTest {
 		Atendimento atendimento = new Atendimento();
 		atendimento.setId(UUID.randomUUID());
 		atendimento.setStatus(status);
+		atendimento.setInstituicao(new Instituicao());
 		return atendimento;
 	}
 

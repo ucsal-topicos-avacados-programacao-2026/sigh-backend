@@ -13,6 +13,7 @@ import com.sigh.sigh.project.paciente.repository.ConsentimentoRepository;
 import com.sigh.sigh.project.paciente.repository.PacienteRepository;
 import com.sigh.sigh.project.prontuario.repository.AtendimentoRepository;
 import com.sigh.sigh.project.usuario.entity.Usuario;
+import com.sigh.sigh.project.usuario.service.UsuarioService;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -35,15 +36,20 @@ public class ConsentimentoService {
 	private final PacienteRepository pacienteRepository;
 	private final AtendimentoRepository atendimentoRepository;
 	private final InstituicaoRepository instituicaoRepository;
+	private final TitularidadeService titularidadeService;
+	private final UsuarioService usuarioService;
 	private final Clock clock;
 
 	public ConsentimentoService(ConsentimentoRepository consentimentoRepository,
 			PacienteRepository pacienteRepository, AtendimentoRepository atendimentoRepository,
-			InstituicaoRepository instituicaoRepository, Clock clock) {
+			InstituicaoRepository instituicaoRepository, TitularidadeService titularidadeService,
+			UsuarioService usuarioService, Clock clock) {
 		this.consentimentoRepository = consentimentoRepository;
 		this.pacienteRepository = pacienteRepository;
 		this.atendimentoRepository = atendimentoRepository;
 		this.instituicaoRepository = instituicaoRepository;
+		this.titularidadeService = titularidadeService;
+		this.usuarioService = usuarioService;
 		this.clock = clock;
 	}
 
@@ -55,7 +61,16 @@ public class ConsentimentoService {
 
 	@Transactional(readOnly = true)
 	public ConsentimentosDoPacienteResponse consultarDoPaciente(String login) {
-		Paciente paciente = pacienteDoUsuario(login);
+		return consultar(pacienteDoUsuario(login));
+	}
+
+	/** Consulta pelo titular ou pelo representante legal vigente. */
+	@Transactional(readOnly = true)
+	public ConsentimentosDoPacienteResponse consultarDoPaciente(UUID pacienteId, String login) {
+		return consultar(titularidadeService.pacienteGerenciado(login, pacienteId));
+	}
+
+	private ConsentimentosDoPacienteResponse consultar(Paciente paciente) {
 		ConsentimentoResponse vigente = consentimentoRepository.decisaoAmplaVigente(paciente.getId())
 				.map(ConsentimentoResponse::de)
 				.orElse(null);
@@ -66,7 +81,16 @@ public class ConsentimentoService {
 	/** Revisão (autorizar) ou revogação feita pelo próprio paciente. */
 	@Transactional
 	public ConsentimentoResponse registrarDecisaoDoPaciente(String login, DecisaoPaciente decisao) {
-		Paciente paciente = pacienteDoUsuario(login);
+		return registrarDecisao(pacienteDoUsuario(login), login, decisao);
+	}
+
+	/** Revisão ou revogação pelo titular ou pelo representante legal vigente, que fica como outorgante. */
+	@Transactional
+	public ConsentimentoResponse registrarDecisaoDoPaciente(UUID pacienteId, String login, DecisaoPaciente decisao) {
+		return registrarDecisao(titularidadeService.pacienteGerenciado(login, pacienteId), login, decisao);
+	}
+
+	private ConsentimentoResponse registrarDecisao(Paciente paciente, String login, DecisaoPaciente decisao) {
 		Optional<Consentimento> vigente = consentimentoRepository.decisaoAmplaVigente(paciente.getId());
 		boolean autorizadoAgora = vigente.map(c -> c.getDecisao() == DecisaoConsentimento.AUTORIZADO).orElse(false);
 
@@ -84,8 +108,8 @@ public class ConsentimentoService {
 				yield DecisaoConsentimento.REVOGADO;
 			}
 		};
-		Consentimento registrado = novaVersao(paciente, nova, vigente.orElse(null), paciente.getConta(),
-				agora());
+		Consentimento registrado = novaVersao(paciente, nova, vigente.orElse(null),
+				usuarioService.buscarPorLogin(login), agora());
 		return ConsentimentoResponse.de(registrado);
 	}
 
@@ -130,13 +154,21 @@ public class ConsentimentoService {
 	private Consentimento novaVersao(Paciente paciente, DecisaoConsentimento decisao, Consentimento anterior,
 			Usuario outorgante, LocalDateTime agora) {
 		Consentimento consentimento = new Consentimento();
-		consentimento.setPaciente(paciente);
-		consentimento.setVersao(consentimentoRepository.ultimaVersao(paciente.getId()) + 1);
 		consentimento.setTipo(TipoConsentimento.AMPLO);
 		consentimento.setDecisao(decisao);
-		consentimento.setVigenteDesde(agora);
 		consentimento.setAnterior(anterior);
 		consentimento.setOutorgante(outorgante);
+		return gravarVersao(paciente, consentimento, agora);
+	}
+
+	/**
+	 * Grava uma decisão como a próxima versão do paciente. Usado também pelas autorizações adicionais
+	 * (RF-009), que dividem a mesma numeração de versões.
+	 */
+	Consentimento gravarVersao(Paciente paciente, Consentimento consentimento, LocalDateTime agora) {
+		consentimento.setPaciente(paciente);
+		consentimento.setVersao(consentimentoRepository.ultimaVersao(paciente.getId()) + 1);
+		consentimento.setVigenteDesde(agora);
 		// A UNIQUE (paciente_id, versao) da V3 barra versões repetidas em decisões simultâneas.
 		return consentimentoRepository.saveAndFlush(consentimento);
 	}

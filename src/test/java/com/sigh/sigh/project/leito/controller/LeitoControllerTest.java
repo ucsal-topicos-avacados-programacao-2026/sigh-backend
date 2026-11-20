@@ -43,7 +43,7 @@ class LeitoControllerTest {
 	@Test
 	@WithMockUser(roles = "ADMINISTRATIVO")
 	void administrativoCadastraLeito() throws Exception {
-		when(leitoService.cadastrar(any(LeitoRequestDTO.class))).thenReturn(new LeitoResponseDTO(
+		when(leitoService.cadastrar(any(LeitoRequestDTO.class), any())).thenReturn(new LeitoResponseDTO(
 				UUID.randomUUID(), INSTITUICAO_ID, "UTI-01", "UTI adulto", CategoriaLeito.UTI, StatusLeito.LIVRE));
 
 		mockMvc.perform(post("/leitos").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(LEITO_VALIDO))

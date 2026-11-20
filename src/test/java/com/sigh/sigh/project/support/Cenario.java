@@ -4,7 +4,13 @@ import com.sigh.sigh.project.instituicao.entity.Instituicao;
 import com.sigh.sigh.project.instituicao.entity.TipoInstituicao;
 import com.sigh.sigh.project.instituicao.repository.InstituicaoRepository;
 import com.sigh.sigh.project.paciente.entity.Paciente;
+import com.sigh.sigh.project.paciente.entity.RepresentacaoLegal;
 import com.sigh.sigh.project.paciente.repository.PacienteRepository;
+import com.sigh.sigh.project.paciente.repository.RepresentacaoLegalRepository;
+import com.sigh.sigh.project.prontuario.entity.RegistroClinico;
+import com.sigh.sigh.project.prontuario.entity.TipoRegistro;
+import com.sigh.sigh.project.prontuario.repository.ProntuarioRepository;
+import com.sigh.sigh.project.prontuario.repository.RegistroClinicoRepository;
 import com.sigh.sigh.project.usuario.entity.Perfil;
 import com.sigh.sigh.project.usuario.entity.Usuario;
 import com.sigh.sigh.project.usuario.entity.VinculoInstitucional;
@@ -30,15 +36,56 @@ public class Cenario {
 	private final UsuarioRepository usuarioRepository;
 	private final VinculoInstitucionalRepository vinculoRepository;
 	private final PacienteRepository pacienteRepository;
+	private final ProntuarioRepository prontuarioRepository;
+	private final RegistroClinicoRepository registroClinicoRepository;
+	private final RepresentacaoLegalRepository representacaoRepository;
 	private final Clock clock;
 
 	public Cenario(InstituicaoRepository instituicaoRepository, UsuarioRepository usuarioRepository,
-			VinculoInstitucionalRepository vinculoRepository, PacienteRepository pacienteRepository, Clock clock) {
+			VinculoInstitucionalRepository vinculoRepository, PacienteRepository pacienteRepository,
+			ProntuarioRepository prontuarioRepository, RegistroClinicoRepository registroClinicoRepository,
+			RepresentacaoLegalRepository representacaoRepository, Clock clock) {
 		this.instituicaoRepository = instituicaoRepository;
 		this.usuarioRepository = usuarioRepository;
 		this.vinculoRepository = vinculoRepository;
 		this.pacienteRepository = pacienteRepository;
+		this.prontuarioRepository = prontuarioRepository;
+		this.registroClinicoRepository = registroClinicoRepository;
+		this.representacaoRepository = representacaoRepository;
 		this.clock = clock;
+	}
+
+	/** Profissional com vínculo ativo na instituição (BE-13); retorna o login. */
+	public String profissional(Instituicao instituicao, Perfil perfil) {
+		return vinculo(instituicao, perfil, LocalDateTime.now(clock).minusDays(30), null);
+	}
+
+	/** Registro clínico fictício no prontuário do paciente, com origem na instituição; retorna o id. */
+	@Transactional
+	public UUID registroClinico(UUID pacienteId, Instituicao origem, String categoria, String conteudo) {
+		RegistroClinico registro = new RegistroClinico();
+		registro.setProntuario(prontuarioRepository.findByPacienteId(pacienteId).orElseThrow());
+		registro.setTipo(TipoRegistro.DIAGNOSTICO);
+		registro.setCriadoEm(LocalDateTime.now(clock).minusHours(1));
+		registro.setConteudo(conteudo);
+		registro.setCategoriaInformacao(categoria);
+		registro.setAutor(usuario(Perfil.MEDICO));
+		registro.setOrigem(origem);
+		return registroClinicoRepository.save(registro).getId();
+	}
+
+	/** Usuário com perfil Paciente que representa o paciente no período informado; retorna o login. */
+	@Transactional
+	public String representante(UUID pacienteId, LocalDateTime inicio, LocalDateTime fim) {
+		Usuario usuario = usuario(Perfil.PACIENTE);
+		RepresentacaoLegal representacao = new RepresentacaoLegal();
+		representacao.setPaciente(pacienteRepository.findById(pacienteId).orElseThrow());
+		representacao.setRepresentante(usuario);
+		representacao.setDocumento("Termo de curatela fictício");
+		representacao.setInicioEm(inicio);
+		representacao.setFimEm(fim);
+		representacaoRepository.save(representacao);
+		return usuario.getLogin();
 	}
 
 	public Instituicao instituicao(boolean credenciada) {

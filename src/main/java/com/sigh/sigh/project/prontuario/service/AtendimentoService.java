@@ -9,8 +9,10 @@ import com.sigh.sigh.project.prontuario.entity.RegistroClinico;
 import com.sigh.sigh.project.prontuario.entity.StatusAtendimento;
 import com.sigh.sigh.project.prontuario.repository.AtendimentoRepository;
 import com.sigh.sigh.project.prontuario.repository.RegistroClinicoRepository;
+import com.sigh.sigh.project.usuario.entity.Perfil;
 import com.sigh.sigh.project.usuario.entity.Usuario;
 import com.sigh.sigh.project.usuario.service.UsuarioService;
+import com.sigh.sigh.project.usuario.service.VinculoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,10 +29,11 @@ public class AtendimentoService {
 	private final RegistroClinicoRepository registroClinicoRepository;
 	private final UsuarioService usuarioService;
 	private final Clock clock;
+	private final VinculoService vinculoService;
 
 	@Transactional
 	public RegistroClinicoResponseDTO registrar(UUID atendimentoId, RegistroClinicoRequestDTO dados, String loginMedico) {
-		Atendimento atendimento = buscarAtendimentoEmAndamento(atendimentoId);
+		Atendimento atendimento = buscarAtendimentoEmAndamento(atendimentoId, loginMedico);
 		Usuario medico = usuarioService.buscarPorLogin(loginMedico);
 		iniciarAtendimentoClinico(atendimento, medico);
 		RegistroClinico registro = new RegistroClinico();
@@ -47,13 +50,14 @@ public class AtendimentoService {
 	}
 
 	@Transactional
-	public void encerrar(UUID atendimentoId) {
-		buscarAtendimentoEmAndamento(atendimentoId).setStatus(StatusAtendimento.ENCERRADO);
+	public void encerrar(UUID atendimentoId, String loginMedico) {
+		buscarAtendimentoEmAndamento(atendimentoId, loginMedico).setStatus(StatusAtendimento.ENCERRADO);
 	}
 
-	private Atendimento buscarAtendimentoEmAndamento(UUID atendimentoId) {
+	private Atendimento buscarAtendimentoEmAndamento(UUID atendimentoId, String loginMedico) {
 		Atendimento atendimento = atendimentoRepository.findById(atendimentoId)
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Atendimento não encontrado."));
+		vinculoService.exigirVinculoAtivo(loginMedico, atendimento.getInstituicao().getId(), Perfil.MEDICO);
 		if (atendimento.getStatus() == StatusAtendimento.ENCERRADO) {
 			throw new RegraNegocioException("Este atendimento já foi encerrado.");
 		}

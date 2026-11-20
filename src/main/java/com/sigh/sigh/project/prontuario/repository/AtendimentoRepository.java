@@ -9,6 +9,8 @@ import java.util.UUID;
 public interface AtendimentoRepository extends JpaRepository<Atendimento, UUID> {
 
 	/** Indica se a instituição já atendeu o paciente até o instante informado (RN-007). */
+	boolean existsByProntuarioPacienteIdAndInstituicaoId(UUID pacienteId, UUID instituicaoId);
+
 	boolean existsByProntuarioPacienteIdAndInstituicaoIdAndChegadaEmLessThanEqual(
 			UUID pacienteId, UUID instituicaoId, LocalDateTime ate);
 }

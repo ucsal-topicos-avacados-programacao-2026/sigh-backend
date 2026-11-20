@@ -7,6 +7,8 @@ import com.sigh.sigh.project.auditoria.dto.PeriodoDTO;
 import com.sigh.sigh.project.auditoria.dto.RegistroAuditoriaResponseDTO;
 import com.sigh.sigh.project.auditoria.repository.RegistroAuditoriaRepository;
 import com.sigh.sigh.project.comum.erro.RegraNegocioException;
+import com.sigh.sigh.project.paciente.entity.Paciente;
+import com.sigh.sigh.project.paciente.service.TitularidadeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -14,16 +16,25 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class ConsultaAuditoriaService {
 
 	private final RegistroAuditoriaRepository registroAuditoriaRepository;
+	private final TitularidadeService titularidadeService;
 
 	@Transactional(readOnly = true)
 	public Page<AcessoDoPacienteDTO> consultarAcessosDoPaciente(String loginPaciente, Pageable paginacao) {
 		return registroAuditoriaRepository.buscarAcessosDoPaciente(loginPaciente, paginacao);
+	}
+
+	/** Acessos ao prontuário, para o titular ou o representante legal vigente (RF-008, RF-009). */
+	@Transactional(readOnly = true)
+	public Page<AcessoDoPacienteDTO> consultarAcessosDoPaciente(UUID pacienteId, String login, Pageable paginacao) {
+		Paciente paciente = titularidadeService.pacienteGerenciado(login, pacienteId);
+		return registroAuditoriaRepository.buscarAcessosAoProntuario(paciente.getId(), paginacao);
 	}
 
 	@Transactional(readOnly = true)

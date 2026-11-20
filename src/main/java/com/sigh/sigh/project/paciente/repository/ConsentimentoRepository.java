@@ -29,6 +29,21 @@ public interface ConsentimentoRepository extends JpaRepository<Consentimento, UU
 	@Query("select c from Consentimento c where c.paciente.id = :pacienteId order by c.versao asc")
 	List<Consentimento> historico(@Param("pacienteId") UUID pacienteId);
 
+	/** Autorizações adicionais (RF-009) ainda não revogadas; a revogação é a versão que aponta para elas. */
+	@Query("""
+			select c from Consentimento c
+			join fetch c.destinataria
+			where c.paciente.id = :pacienteId
+			  and c.tipo = com.sigh.sigh.project.paciente.entity.TipoConsentimento.ADICIONAL
+			  and c.decisao = com.sigh.sigh.project.paciente.entity.DecisaoConsentimento.AUTORIZADO
+			  and not exists (select 1 from Consentimento revogacao
+				where revogacao.anterior = c
+				  and revogacao.tipo = com.sigh.sigh.project.paciente.entity.TipoConsentimento.ADICIONAL
+				  and revogacao.decisao = com.sigh.sigh.project.paciente.entity.DecisaoConsentimento.REVOGADO)
+			order by c.vigenteDesde desc
+			""")
+	List<Consentimento> autorizacoesAdicionaisVigentes(@Param("pacienteId") UUID pacienteId);
+
 	default Optional<Consentimento> decisaoAmplaVigente(UUID pacienteId) {
 		return decisoesAmplas(pacienteId, TipoConsentimento.AMPLO, Limit.of(1)).stream().findFirst();
 	}

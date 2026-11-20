@@ -1,6 +1,7 @@
 package com.sigh.sigh.project.leito.service;
 
 import com.sigh.sigh.project.comum.erro.RegraNegocioException;
+import com.sigh.sigh.project.instituicao.entity.Instituicao;
 import com.sigh.sigh.project.leito.dto.InternacaoRequestDTO;
 import com.sigh.sigh.project.leito.entity.Internacao;
 import com.sigh.sigh.project.leito.entity.Leito;
@@ -17,6 +18,8 @@ import com.sigh.sigh.project.prontuario.entity.TipoRegistro;
 import com.sigh.sigh.project.prontuario.repository.AtendimentoRepository;
 import com.sigh.sigh.project.prontuario.repository.RegistroClinicoRepository;
 import com.sigh.sigh.project.support.RelogioDeTeste;
+import com.sigh.sigh.project.usuario.entity.Perfil;
+import com.sigh.sigh.project.usuario.service.VinculoService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -24,6 +27,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -33,12 +37,17 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class InternacaoServiceTest {
+
+	private static final Instituicao HOSPITAL = hospital();
+
+	private static final String LOGIN_ADMINISTRATIVO = "administrativo.teste";
 
 	private static final LocalDateTime AGORA = LocalDateTime.of(2026, 11, 19, 10, 30);
 
@@ -60,6 +69,9 @@ class InternacaoServiceTest {
 	@Spy
 	private Clock clock = RelogioDeTeste.em(AGORA);
 
+	@Mock
+	private VinculoService vinculoService;
+
 	@InjectMocks
 	private InternacaoService internacaoService;
 
@@ -70,7 +82,7 @@ class InternacaoServiceTest {
 		when(atendimentoRepository.findById(atendimento.getId())).thenReturn(Optional.of(atendimento));
 		when(leitoRepository.findComBloqueioById(leito.getId())).thenReturn(Optional.of(leito));
 
-		internacaoService.internar(new InternacaoRequestDTO(atendimento.getId(), leito.getId()));
+		internacaoService.internar(new InternacaoRequestDTO(atendimento.getId(), leito.getId()), LOGIN_ADMINISTRATIVO);
 
 		ArgumentCaptor<Internacao> internacao = ArgumentCaptor.forClass(Internacao.class);
 		verify(internacaoRepository).save(internacao.capture());
@@ -88,7 +100,7 @@ class InternacaoServiceTest {
 		when(atendimentoRepository.findById(atendimento.getId())).thenReturn(Optional.of(atendimento));
 		when(leitoRepository.findComBloqueioById(leito.getId())).thenReturn(Optional.of(leito));
 
-		assertThatThrownBy(() -> internacaoService.internar(new InternacaoRequestDTO(atendimento.getId(), leito.getId())))
+		assertThatThrownBy(() -> internacaoService.internar(new InternacaoRequestDTO(atendimento.getId(), leito.getId()), LOGIN_ADMINISTRATIVO))
 				.isInstanceOf(RegraNegocioException.class);
 		verify(internacaoRepository, never()).save(any());
 		assertThat(leito.getStatus()).isEqualTo(StatusLeito.EM_HIGIENIZACAO);
@@ -101,7 +113,7 @@ class InternacaoServiceTest {
 		when(internacaoRepository.existsByProntuarioIdAndAltaEmIsNull(atendimento.getProntuario().getId()))
 				.thenReturn(true);
 
-		assertThatThrownBy(() -> internacaoService.internar(new InternacaoRequestDTO(atendimento.getId(), UUID.randomUUID())))
+		assertThatThrownBy(() -> internacaoService.internar(new InternacaoRequestDTO(atendimento.getId(), UUID.randomUUID()), LOGIN_ADMINISTRATIVO))
 				.isInstanceOf(RegraNegocioException.class);
 		verify(internacaoRepository, never()).save(any());
 	}
@@ -116,7 +128,7 @@ class InternacaoServiceTest {
 		when(leitoRepository.findComBloqueioById(destino.getId())).thenReturn(Optional.of(destino));
 		when(ocupacaoLeitoRepository.buscarOcupacaoAtual(internacao.getId())).thenReturn(Optional.of(ocupacaoAtual));
 
-		internacaoService.transferir(internacao.getId(), destino.getId());
+		internacaoService.transferir(internacao.getId(), destino.getId(), LOGIN_ADMINISTRATIVO);
 
 		assertThat(origem.getStatus()).isEqualTo(StatusLeito.EM_HIGIENIZACAO);
 		assertThat(ocupacaoAtual.getFimEm()).isEqualTo(AGORA);
@@ -130,7 +142,7 @@ class InternacaoServiceTest {
 		when(internacaoRepository.findById(internacao.getId())).thenReturn(Optional.of(internacao));
 		when(leitoRepository.findComBloqueioById(destino.getId())).thenReturn(Optional.of(destino));
 
-		assertThatThrownBy(() -> internacaoService.transferir(internacao.getId(), destino.getId()))
+		assertThatThrownBy(() -> internacaoService.transferir(internacao.getId(), destino.getId(), LOGIN_ADMINISTRATIVO))
 				.isInstanceOf(RegraNegocioException.class);
 		verify(ocupacaoLeitoRepository, never()).buscarOcupacaoAtual(any());
 	}
@@ -145,7 +157,7 @@ class InternacaoServiceTest {
 		when(ocupacaoLeitoRepository.buscarOcupacaoAtual(internacao.getId()))
 				.thenReturn(Optional.of(novaOcupacao(leito, internacao)));
 
-		internacaoService.darAlta(internacao.getId(), resumo.getId());
+		internacaoService.darAlta(internacao.getId(), resumo.getId(), LOGIN_ADMINISTRATIVO);
 
 		assertThat(internacao.getAltaEm()).isEqualTo(AGORA);
 		assertThat(internacao.getResumoAlta()).isSameAs(resumo);
@@ -159,7 +171,7 @@ class InternacaoServiceTest {
 		when(internacaoRepository.findById(internacao.getId())).thenReturn(Optional.of(internacao));
 		when(registroClinicoRepository.findById(evolucao.getId())).thenReturn(Optional.of(evolucao));
 
-		assertThatThrownBy(() -> internacaoService.darAlta(internacao.getId(), evolucao.getId()))
+		assertThatThrownBy(() -> internacaoService.darAlta(internacao.getId(), evolucao.getId(), LOGIN_ADMINISTRATIVO))
 				.isInstanceOf(RegraNegocioException.class);
 		assertThat(internacao.getAltaEm()).isNull();
 	}
@@ -171,7 +183,7 @@ class InternacaoServiceTest {
 		when(internacaoRepository.findById(internacao.getId())).thenReturn(Optional.of(internacao));
 		when(registroClinicoRepository.findById(resumo.getId())).thenReturn(Optional.of(resumo));
 
-		assertThatThrownBy(() -> internacaoService.darAlta(internacao.getId(), resumo.getId()))
+		assertThatThrownBy(() -> internacaoService.darAlta(internacao.getId(), resumo.getId(), LOGIN_ADMINISTRATIVO))
 				.isInstanceOf(RegraNegocioException.class);
 	}
 
@@ -181,8 +193,58 @@ class InternacaoServiceTest {
 		internacao.setAltaEm(LocalDateTime.now(clock));
 		when(internacaoRepository.findById(internacao.getId())).thenReturn(Optional.of(internacao));
 
-		assertThatThrownBy(() -> internacaoService.transferir(internacao.getId(), UUID.randomUUID()))
+		assertThatThrownBy(() -> internacaoService.transferir(internacao.getId(), UUID.randomUUID(), LOGIN_ADMINISTRATIVO))
 				.isInstanceOf(RegraNegocioException.class);
+	}
+
+	private static Instituicao hospital() {
+		Instituicao instituicao = new Instituicao();
+		instituicao.setId(UUID.randomUUID());
+		return instituicao;
+	}
+
+	@Test
+	void internarEmLeitoDeOutraInstituicaoEhBloqueado() {
+		Atendimento atendimento = novoAtendimento();
+		Leito leito = novoLeito(StatusLeito.LIVRE);
+		leito.setInstituicao(hospital());
+		when(atendimentoRepository.findById(atendimento.getId())).thenReturn(Optional.of(atendimento));
+		when(leitoRepository.findComBloqueioById(leito.getId())).thenReturn(Optional.of(leito));
+
+		assertThatThrownBy(() -> internacaoService.internar(new InternacaoRequestDTO(atendimento.getId(), leito.getId()),
+				LOGIN_ADMINISTRATIVO))
+				.isInstanceOf(RegraNegocioException.class)
+				.hasMessageContaining("outra instituição");
+		verify(internacaoRepository, never()).save(any());
+		assertThat(leito.getStatus()).isEqualTo(StatusLeito.LIVRE);
+	}
+
+	@Test
+	void semVinculoComAInstituicaoDoAtendimentoNaoInterna() {
+		Atendimento atendimento = novoAtendimento();
+		when(atendimentoRepository.findById(atendimento.getId())).thenReturn(Optional.of(atendimento));
+		doThrow(new AccessDeniedException("sem vínculo")).when(vinculoService)
+				.exigirVinculoAtivo(LOGIN_ADMINISTRATIVO, HOSPITAL.getId(), Perfil.ADMINISTRATIVO);
+
+		assertThatThrownBy(() -> internacaoService.internar(new InternacaoRequestDTO(atendimento.getId(), UUID.randomUUID()),
+				LOGIN_ADMINISTRATIVO))
+				.isInstanceOf(AccessDeniedException.class);
+		verify(internacaoRepository, never()).save(any());
+		verify(leitoRepository, never()).findComBloqueioById(any());
+	}
+
+	@Test
+	void transferenciaExigeVinculoComAInstituicaoOndeOPacienteEstaInternado() {
+		Internacao internacao = novaInternacao();
+		UUID instituicaoAtual = UUID.randomUUID();
+		when(internacaoRepository.findById(internacao.getId())).thenReturn(Optional.of(internacao));
+		when(ocupacaoLeitoRepository.instituicaoDaOcupacaoAtual(internacao.getId())).thenReturn(Optional.of(instituicaoAtual));
+		doThrow(new AccessDeniedException("sem vínculo")).when(vinculoService)
+				.exigirVinculoAtivo(LOGIN_ADMINISTRATIVO, instituicaoAtual, Perfil.ADMINISTRATIVO);
+
+		assertThatThrownBy(() -> internacaoService.transferir(internacao.getId(), UUID.randomUUID(), LOGIN_ADMINISTRATIVO))
+				.isInstanceOf(AccessDeniedException.class);
+		verify(ocupacaoLeitoRepository, never()).buscarOcupacaoAtual(any());
 	}
 
 	private Prontuario novoProntuario() {
@@ -195,6 +257,7 @@ class InternacaoServiceTest {
 		Atendimento atendimento = new Atendimento();
 		atendimento.setId(UUID.randomUUID());
 		atendimento.setProntuario(novoProntuario());
+		atendimento.setInstituicao(HOSPITAL);
 		return atendimento;
 	}
 
@@ -202,6 +265,7 @@ class InternacaoServiceTest {
 		Internacao internacao = new Internacao();
 		internacao.setId(UUID.randomUUID());
 		internacao.setProntuario(novoProntuario());
+		internacao.setAtendimentoOrigem(novoAtendimento());
 		return internacao;
 	}
 
@@ -209,6 +273,7 @@ class InternacaoServiceTest {
 		Leito leito = new Leito();
 		leito.setId(UUID.randomUUID());
 		leito.setStatus(status);
+		leito.setInstituicao(HOSPITAL);
 		return leito;
 	}
 

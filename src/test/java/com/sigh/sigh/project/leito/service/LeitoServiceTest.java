@@ -10,6 +10,7 @@ import com.sigh.sigh.project.leito.entity.CategoriaLeito;
 import com.sigh.sigh.project.leito.entity.Leito;
 import com.sigh.sigh.project.leito.entity.StatusLeito;
 import com.sigh.sigh.project.leito.repository.LeitoRepository;
+import com.sigh.sigh.project.usuario.service.VinculoService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -29,11 +30,16 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class LeitoServiceTest {
 
+	private static final String LOGIN_ADMINISTRATIVO = "administrativo.teste";
+
 	@Mock
 	private LeitoRepository leitoRepository;
 
 	@Mock
 	private InstituicaoRepository instituicaoRepository;
+
+	@Mock
+	private VinculoService vinculoService;
 
 	@InjectMocks
 	private LeitoService leitoService;
@@ -45,7 +51,7 @@ class LeitoServiceTest {
 		when(leitoRepository.save(any(Leito.class))).thenAnswer(chamada -> chamada.getArgument(0));
 
 		LeitoResponseDTO leito = leitoService.cadastrar(
-				new LeitoRequestDTO(instituicao.getId(), "UTI-01", "UTI adulto", CategoriaLeito.UTI));
+				new LeitoRequestDTO(instituicao.getId(), "UTI-01", "UTI adulto", CategoriaLeito.UTI), LOGIN_ADMINISTRATIVO);
 
 		assertThat(leito.status()).isEqualTo(StatusLeito.LIVRE);
 		assertThat(leito.categoria()).isEqualTo(CategoriaLeito.UTI);
@@ -58,7 +64,7 @@ class LeitoServiceTest {
 		when(leitoRepository.existsByInstituicaoIdAndCodigo(instituicao.getId(), "UTI-01")).thenReturn(true);
 
 		assertThatThrownBy(() -> leitoService.cadastrar(
-				new LeitoRequestDTO(instituicao.getId(), "UTI-01", "UTI adulto", CategoriaLeito.UTI)))
+				new LeitoRequestDTO(instituicao.getId(), "UTI-01", "UTI adulto", CategoriaLeito.UTI), LOGIN_ADMINISTRATIVO))
 				.isInstanceOf(RegraNegocioException.class);
 		verify(leitoRepository, never()).save(any());
 	}
@@ -69,7 +75,7 @@ class LeitoServiceTest {
 		when(instituicaoRepository.findById(instituicaoId)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> leitoService.cadastrar(
-				new LeitoRequestDTO(instituicaoId, "ENF-01", "Clínica médica", CategoriaLeito.ENFERMARIA)))
+				new LeitoRequestDTO(instituicaoId, "ENF-01", "Clínica médica", CategoriaLeito.ENFERMARIA), LOGIN_ADMINISTRATIVO))
 				.isInstanceOf(RecursoNaoEncontradoException.class);
 	}
 
@@ -78,7 +84,7 @@ class LeitoServiceTest {
 		Leito leito = novoLeito(StatusLeito.EM_HIGIENIZACAO);
 		when(leitoRepository.findComBloqueioById(leito.getId())).thenReturn(Optional.of(leito));
 
-		leitoService.alterarStatus(leito.getId(), StatusLeito.LIVRE);
+		leitoService.alterarStatus(leito.getId(), StatusLeito.LIVRE, LOGIN_ADMINISTRATIVO);
 
 		assertThat(leito.getStatus()).isEqualTo(StatusLeito.LIVRE);
 	}
@@ -88,7 +94,7 @@ class LeitoServiceTest {
 		Leito leito = novoLeito(StatusLeito.LIVRE);
 		when(leitoRepository.findComBloqueioById(leito.getId())).thenReturn(Optional.of(leito));
 
-		assertThatThrownBy(() -> leitoService.alterarStatus(leito.getId(), StatusLeito.OCUPADO))
+		assertThatThrownBy(() -> leitoService.alterarStatus(leito.getId(), StatusLeito.OCUPADO, LOGIN_ADMINISTRATIVO))
 				.isInstanceOf(RegraNegocioException.class);
 		assertThat(leito.getStatus()).isEqualTo(StatusLeito.LIVRE);
 	}
@@ -98,7 +104,7 @@ class LeitoServiceTest {
 		Leito leito = novoLeito(StatusLeito.OCUPADO);
 		when(leitoRepository.findComBloqueioById(leito.getId())).thenReturn(Optional.of(leito));
 
-		assertThatThrownBy(() -> leitoService.alterarStatus(leito.getId(), StatusLeito.LIVRE))
+		assertThatThrownBy(() -> leitoService.alterarStatus(leito.getId(), StatusLeito.LIVRE, LOGIN_ADMINISTRATIVO))
 				.isInstanceOf(RegraNegocioException.class);
 		assertThat(leito.getStatus()).isEqualTo(StatusLeito.OCUPADO);
 	}
