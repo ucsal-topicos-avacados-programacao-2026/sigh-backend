@@ -31,12 +31,21 @@ O último caso é o controle positivo: como a única diferença entre eles é o 
 
 Em emergência, médico ou enfermeiro com vínculo no hospital do atendimento vê também o que o paciente restringiu (`POST /atendimentos/{id}/historico/emergencia`). Antes de qualquer dado aparecer, a justificativa (mínimo de 20 caracteres) é gravada na auditoria, e o paciente vê o acesso marcado como emergência.
 
-**Controles contra abuso (BE-18).** São três, decididos pelo grupo em 20/11/2026:
-1. **Gravidade:** só vale se a classificação de risco confirmada mais recente do atendimento for vermelha ou laranja. Se o paciente melhorar e for reclassificado, perde a emergência. Se piorar de novo, recupera. Isso só vale enquanto a reclassificação é possível: hoje, a triagem só é aceita antes de o médico começar o atendimento. Um paciente vermelho há mais de 12 horas em atendimento, ou um atendimento que nunca passou por triagem, fica sem acesso de emergência. A regra de triagem durante o atendimento está no card BE-24.
+**Controles contra abuso (BE-18 e BE-24).** Decididos pelo grupo em 20/11/2026:
+1. **Gravidade:** só vale se a classificação de risco confirmada mais recente do atendimento for vermelha ou laranja. Se o paciente melhorar e for reclassificado, perde a emergência. Se piorar de novo, recupera. O enfermeiro pode reclassificar o risco a qualquer momento até o atendimento ser encerrado, inclusive com o paciente já com o médico ou internado, enquanto o atendimento de origem continuar aberto (BE-24). A reclassificação não devolve o paciente para a fila de triagem. Cada nova classificação vermelha ou laranja recomeça a janela de 12 horas. Por isso, dois profissionais combinados conseguem renovar a janela sem limite, e a fila e a auditoria registram cada passo. Isso foi aceito na decisão.
 2. **Janela:** só vale até 12 horas depois dessa classificação (`sigh.emergencia.janela`).
 3. **Revisão obrigatória:** todo acesso de emergência entra na fila do auditor (`GET /auditoria/emergencias/pendentes`, do mais antigo para o mais novo). Ele só sai dela quando o auditor registra uma análise conclusiva (regular, indevido ou inconclusivo) em `POST /auditoria/registros/{id}/analises`, seja um parecer ou um alerta. Uma análise "pendente" não o tira da fila.
 
-Não há teto de acessos por profissional: um teto poderia bloquear uma emergência de verdade. As tentativas recusadas (sem classificação grave ou fora da janela) não ficam na auditoria. O auditor também vê os indicadores por instituição. Os controles estão provados em `EmergenciaControladaTest`.
+4. **Duas pessoas (BE-24):** quem confirmou a classificação vermelha ou laranja não pode usar o acesso de emergência com base nela. Precisa ser outro profissional, para que reclassificar não vire atalho para a emergência.
+
+Toda tentativa recusada por esses controles fica na auditoria, com um motivo curto e fixo na finalidade. São três motivos:
+- "Tentativa de acesso de emergência recusada: sem classificação vermelha ou laranja confirmada";
+- "... fora da janela depois da classificação";
+- "... quem confirmou a classificação tentou usá-la".
+
+Ela fica numa transação própria, para não ser desfeita junto com a recusa. Se essa gravação falhar, o acesso continua negado. O auditor vê a tentativa em `/auditoria/registros`, e o paciente, nos acessos ao seu prontuário. Ela não entra na fila de emergências nem nos indicadores por instituição, porque nenhum dado foi visto. Uma classificação sem quem a confirmou registrado não libera emergência, e uma triagem de atendimento já encerrado não pode ser confirmada.
+
+Não há teto de acessos por profissional: um teto poderia bloquear uma emergência de verdade. O auditor também vê os indicadores por instituição. Os controles estão provados em `EmergenciaControladaTest`.
 
 ## Segurança dos dados (RNF-004, RNF-007)
 
