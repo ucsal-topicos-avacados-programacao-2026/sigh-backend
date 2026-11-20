@@ -75,7 +75,7 @@ class ProtecaoDeDadosTest extends TesteIntegracao {
 		assertThat(saida.getAll()).doesNotContain(cpf).doesNotContain(Cenario.comMascara(cpf));
 	}
 
-	/** A V2 impede duas decisões com a mesma versão para o mesmo paciente. */
+	/** A V3 impede duas decisões com a mesma versão para o mesmo paciente. */
 	@Test
 	void versaoDeConsentimentoRepetidaEhBarradaPeloBanco() {
 		Paciente paciente = pacienteRepository.saveAndFlush(paciente(Cenario.novoCpf()));

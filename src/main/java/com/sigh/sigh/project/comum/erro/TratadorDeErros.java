@@ -24,7 +24,7 @@ public class TratadorDeErros {
 	private static final Logger log = LoggerFactory.getLogger(TratadorDeErros.class);
 
 	@ExceptionHandler(MethodArgumentNotValidException.class)
-	ProblemDetail validacao(MethodArgumentNotValidException ex) {
+	public ProblemDetail validacao(MethodArgumentNotValidException ex) {
 		Map<String, String> campos = new TreeMap<>();
 		for (FieldError erro : ex.getBindingResult().getFieldErrors()) {
 			campos.putIfAbsent(erro.getField(), erro.getDefaultMessage());
@@ -33,22 +33,22 @@ public class TratadorDeErros {
 	}
 
 	@ExceptionHandler(DadosInvalidosException.class)
-	ProblemDetail dadosInvalidos(DadosInvalidosException ex) {
+	public ProblemDetail dadosInvalidos(DadosInvalidosException ex) {
 		return dadosInvalidos(ex.getCampos());
 	}
 
 	@ExceptionHandler(HttpMessageNotReadableException.class)
-	ProblemDetail corpoIlegivel(HttpMessageNotReadableException ex) {
+	public ProblemDetail corpoIlegivel(HttpMessageNotReadableException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Corpo da requisição inválido.");
 	}
 
 	@ExceptionHandler(RecursoNaoEncontradoException.class)
-	ProblemDetail naoEncontrado(RecursoNaoEncontradoException ex) {
+	public ProblemDetail naoEncontrado(RecursoNaoEncontradoException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
 	}
 
 	@ExceptionHandler(RegraNegocioException.class)
-	ProblemDetail regraNegocio(RegraNegocioException ex) {
+	public ProblemDetail regraNegocio(RegraNegocioException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage());
 	}
 
@@ -58,7 +58,7 @@ public class TratadorDeErros {
 	 * repassada nem registrada; o log guarda apenas o SQLState.
 	 */
 	@ExceptionHandler(DataIntegrityViolationException.class)
-	ProblemDetail integridade(DataIntegrityViolationException ex) {
+	public ProblemDetail integridade(DataIntegrityViolationException ex) {
 		if (ViolacaoDeUnicidade.eh(ex)) {
 			return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
 					"A operação conflita com outra feita ao mesmo tempo. Consulte novamente e repita.");
@@ -72,5 +72,15 @@ public class TratadorDeErros {
 		ProblemDetail problema = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Dados inválidos.");
 		problema.setProperty("campos", campos);
 		return problema;
+	}
+
+	@ExceptionHandler(CredenciaisInvalidasException.class)
+	public ProblemDetail credenciaisInvalidas(CredenciaisInvalidasException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
+	}
+
+	@ExceptionHandler(IAIndisponivelException.class)
+	public ProblemDetail iaIndisponivel(IAIndisponivelException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
 	}
 }
