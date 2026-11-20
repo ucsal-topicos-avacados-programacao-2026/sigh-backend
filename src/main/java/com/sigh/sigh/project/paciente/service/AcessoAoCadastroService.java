@@ -115,7 +115,7 @@ public class AcessoAoCadastroService {
 		if (representacao.getFimEm() != null && !representacao.getFimEm().isAfter(agora)) {
 			throw new RegraNegocioException("A representação já foi encerrada.");
 		}
-		representacao.setFimEm(agora);
+		representacao.setFimEm(agora.isBefore(representacao.getInicioEm()) ? representacao.getInicioEm() : agora);
 		auditar(paciente, instituicaoId, loginAdministrativo, FINALIDADE_ENCERRAMENTO);
 		return RepresentacaoResponse.de(representacao, agora);
 	}

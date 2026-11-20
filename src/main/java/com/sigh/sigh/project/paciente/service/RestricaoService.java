@@ -76,6 +76,7 @@ public class RestricaoService {
 			throw new RegraNegocioException("A restrição já foi encerrada.");
 		}
 		restricao.setFimEm(agora);
+		restricao.setEncerradaPor(usuarioService.buscarPorLogin(login));
 		return RestricaoResponse.de(restricao, agora);
 	}
 
