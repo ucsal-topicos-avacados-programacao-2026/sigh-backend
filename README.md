@@ -197,7 +197,15 @@ Toda tabela regravada passa por `VACUUM (FULL, ANALYZE)`, seguido de `VACUUM FUL
 
 **Depois da primeira implantação de cada versão da criptografia, e depois de cada troca de chave:**
 1. Pare todas as instâncias da versão anterior antes de subir a nova. O que uma instância antiga gravar depois da migração fica fora do formato e é recusado. Para refazer a migração, apague a linha de `controle_cifragem`.
-2. Rode `backup-completo.sh --descartar-anteriores`. Ele apaga as cadeias anteriores, aqui e no destino externo, e o WAL arquivado anterior, que guardam os valores antigos.
+2. Rode `limpar-wal-legado.sh` no container do banco (`docker exec <container do banco> limpar-wal-legado.sh`). Ele tira do servidor os segmentos de WAL que guardam o dado de antes da cifragem, ou o cifrado com a chave antiga (BE-26):
+   - desliga o reaproveitamento de segmentos;
+   - grava WAL de enchimento até passar do segmento mais adiantado: do atual em diante, inclusive os reaproveitados para uso futuro, os segmentos são sobrescritos por inteiro;
+   - espera o arquivamento e faz checkpoints até nenhum segmento de antes existir mais. Os anteriores ao atual são apagados, não sobrescritos (veja "Limites conhecidos").
+
+   Ele sai com erro, dizendo o motivo, se algum continuar: arquivamento parado, slot de replicação, `wal_keep_size` ou o resumo do WAL atrasado. Antes de rodar:
+   - pause o agendador de backup, porque um backup em andamento cria um slot que retém WAL;
+   - confira o espaço livre no volume do banco. O enchimento grava o mesmo volume no WAL e nos dados, até passar do segmento mais adiantado (no máximo cerca de `max_wal_size`). O script confere o espaço e para antes, se faltar.
+3. Rode `backup-completo.sh --descartar-anteriores`. Ele apaga as cadeias anteriores, aqui e no destino externo, e o WAL arquivado anterior, que guardam os valores antigos.
 
 ### Chaves
 
@@ -241,6 +249,7 @@ Quem faz essa conferência é `ConexaoSeguraComOBanco`.
 **O banco com TLS:** a imagem `docker/backup` também sobe o PostgreSQL, com `iniciar-banco.sh`. Ela precisa das variáveis da imagem oficial (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`) e de `SIGH_TLS_CERTIFICADO_BANCO` e `SIGH_TLS_CHAVE_BANCO`, que são os caminhos dos arquivos PEM montados no container. Ela sobe:
 - só com TLS 1.2 ou 1.3 e com `pg_hba-tls.conf`, que recusa qualquer conexão sem TLS, inclusive a de replicação;
 - com `summarize_wal` ligado, para o backup incremental;
+- com `wal_recycle` desligado: um segmento de WAL antigo é apagado, e não renomeado para uso futuro com o conteúdo antigo dentro;
 - com `SIGH_WAL_DIR`, arquivando o WAL cifrado.
 
 O teste `TlsTest` sobe o back-end nesse perfil contra esse banco, com certificados fictícios. Ele confere:
@@ -262,6 +271,7 @@ A rotina fica em `backup/` e usa o backup incremental nativo do PostgreSQL 17 (`
 | `arquivar-wal.sh` | A cada segmento de WAL (no servidor) | Comprime e cifra o segmento em `SIGH_WAL_DIR`. Grava em disco (`sync`) antes de confirmar ao servidor. Nunca sobrescreve um segmento diferente já arquivado, e uma sobra de queda não o trava |
 | `restaurar.sh <cadeia> <pasta-vazia> [pasta-do-wal]` | Na recuperação | Decifra conferindo a integridade, combina e verifica tudo, inclusive o WAL, com `pg_verifybackup`. Com a pasta do WAL, o servidor aplica ao subir o que mudou depois do último backup (`recuperar-wal.sh`). Um segmento alterado, a chave ausente ou a pasta inacessível interrompem a restauração, em vez de terminá-la ali em silêncio. A cópia restaurada sobe sem arquivar WAL |
 | `verificar-backup.sh` | `HEALTHCHECK` da imagem, a cada 10 min | O alerta: veja abaixo |
+| `limpar-wal-legado.sh` | Uma vez, no container do banco, depois da migração da cifragem e de cada troca de chave | Tira do servidor os segmentos de WAL com o dado de antes (veja "Manutenção ao subir"). Provado em `LimpezaDoWalLegadoTest` |
 
 Comportamento da rotina:
 - **Só com TLS:** o backup só conecta ao banco com `PGSSLMODE=verify-full`, conferindo o certificado do servidor (`PGSSLROOTCERT`).
@@ -311,7 +321,10 @@ Comportamento da rotina:
 - **Valor antigo da mesma linha:** o vínculo prende o valor à linha e à coluna, não a uma versão. Recolocar um valor cifrado mais antigo da mesma linha, tirado de um backup, é aceito.
 - **Leitura recusada derruba a consulta inteira:** uma linha adulterada faz falhar toda consulta que a carrega. Isso vale para o histórico do paciente e para a fila. Vale também para o segredo do segundo fator: um `usuario.mfa_segredo` adulterado derruba o login desse usuário e toda consulta que o carrega como autor, ator ou registrador, como a listagem do auditor. Isso é de propósito: o prontuário não aparece pela metade sem aviso. A correção é restaurar o valor a partir do backup.
 - **Auditoria antiga:** a justificativa das auditorias listadas na migração continua como estava, em claro ou sem vínculo à linha, porque a tabela é imutável. Entre essas linhas, um valor `sigh:v1` copiado de uma para outra seria aceito.
-- **WAL de antes da cifragem:** os segmentos de WAL do servidor de antes da migração podem ter o dado em claro até serem reciclados.
+- **WAL de antes da cifragem:** os segmentos de WAL do servidor de antes da migração têm o dado em claro até o `limpar-wal-legado.sh` rodar. Depois dele, nenhum arquivo de `pg_wal` tem o dado, mas há limites:
+  - os segmentos anteriores ao atual, onde estão o INSERT legado e a migração, são apagados, não sobrescritos. O conteúdo pode continuar nos blocos livres do disco até ser reaproveitado, em qualquer tipo de disco;
+  - réplicas e outras cópias do servidor ficam fora do alcance do script. Uma réplica sem slot nem `restore_command` pode ficar para trás com o enchimento;
+  - a justificativa das auditorias antigas, mantida em claro de propósito (veja acima), volta ao WAL quando uma página dela é gravada de novo por inteiro.
 - **Chave do WAL no servidor do banco:** o arquivamento roda no servidor do banco, então `SIGH_CHAVE_BACKUP` fica no ambiente dele, e um superusuário do banco consegue lê-la. Quem administra o servidor já tem acesso ao banco em claro. A aplicação não deve conectar como superusuário.
 - **Cópia restaurada:** ela sobe com a configuração de autenticação padrão e sem arquivar WAL. Para pô-la em uso, suba-a com `iniciar-banco.sh`, que liga o TLS obrigatório, e com outro `SIGH_WAL_DIR`. Com o mesmo, a nova linha do tempo dela desviaria as próximas restaurações.
 - **Alerta da aplicação:** o `/actuator/health` exige login, como toda rota, e a detecção de valor fora do formato só é refeita quando a aplicação sobe. A fila de VACUUM é conferida a cada consulta. O alerta sem login é o do container de backup, pelo HEALTHCHECK.
