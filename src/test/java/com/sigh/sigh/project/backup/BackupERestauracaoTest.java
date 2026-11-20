@@ -144,16 +144,30 @@ class BackupERestauracaoTest {
 		assertThat(restauracao.getStderr()).contains("cópia alterada ou chave errada");
 	}
 
+	/** Um .parcial deixado por uma execução interrompida não trava os backups seguintes. */
+	@Test
+	void sobraDeExecucaoInterrompidaNaoTravaOIncremental() throws Exception {
+		inserirPaciente(8, true);
+		rodar("backup-completo.sh");
+		String cadeia = rodar("cat /backups/cadeia-atual").getStdout().strip();
+		rodar("echo resto > " + cadeia + "/001-incremental.tar.gz.gpg.parcial");
+
+		rodar("backup-incremental.sh");
+
+		assertThat(rodar("ls " + cadeia).getStdout()).contains("001-incremental.tar.gz.gpg").doesNotContain(".parcial");
+		rodar("restaurar.sh " + cadeia + " /restaurado-apos-parcial");
+	}
+
 	@Test
 	void chaveFracaEhRecusadaENaoApareceNaLinhaDeComando() throws Exception {
 		ExecResult fraca = executor.execInContainer("sh", "-c", "SIGH_CHAVE_BACKUP=curta backup-completo.sh");
 		assertThat(fraca.getExitCode()).isNotZero();
 		assertThat(fraca.getStderr()).contains("pelo menos 32 caracteres");
 
-		// Lê a linha de comando de todos os processos enquanto o backup roda, e espera ele terminar.
-		String processos = rodar("backup-completo.sh >/dev/null 2>&1 & backup=$!; for i in 1 2 3 4 5 6 7 8 9 10; do"
-				+ " cat /proc/[0-9]*/cmdline 2>/dev/null | tr '\\0' ' '; sleep 0.2; done; wait $backup").getStdout();
-		assertThat(processos).contains("pg_basebackup").doesNotContain(CHAVE_BACKUP);
+		// Lê a linha de comando de todos os processos durante todo o backup (pg_basebackup e gpg).
+		String processos = rodar("backup-completo.sh >/dev/null 2>&1 & backup=$!; while kill -0 $backup 2>/dev/null; do"
+				+ " cat /proc/[0-9]*/cmdline 2>/dev/null | tr '\\0' ' '; sleep 0.05; done; wait $backup").getStdout();
+		assertThat(processos).contains("pg_basebackup", "gpg").doesNotContain(CHAVE_BACKUP);
 	}
 
 	/** A imagem, sem argumentos, sobe o crond com a cadeia semanal e o incremental diário. */

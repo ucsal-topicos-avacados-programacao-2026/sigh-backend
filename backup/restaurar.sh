@@ -9,13 +9,14 @@ set -eu
 cadeia="$1"; destino="$2"
 [ ! -e "$destino" ] || [ -z "$(ls -A "$destino")" ] || { log "destino $destino não está vazio"; exit 1; }
 
-partes=""
-for arquivo in $(ls "$cadeia"/*.tar.gz.gpg | sort); do
+# O glob já vem em ordem (000-completo, 001-incremental, ...); aspas protegem caminhos com espaço.
+set --
+for arquivo in "$cadeia"/*.tar.gz.gpg; do
+    [ -e "$arquivo" ] || { log "nenhuma cópia em $cadeia"; exit 1; }
     parte="$trabalho/$(basename "$arquivo" .tar.gz.gpg)"
     decifrar_para "$arquivo" "$parte"
-    partes="$partes $parte"
+    set -- "$@" "$parte"
 done
-# shellcheck disable=SC2086
-pg_combinebackup -o "$destino" $partes
+pg_combinebackup -o "$destino" "$@"
 pg_verifybackup -q "$destino"
 log "cadeia $(basename "$cadeia") restaurada em $destino"

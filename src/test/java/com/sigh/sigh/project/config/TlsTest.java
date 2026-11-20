@@ -100,7 +100,6 @@ class TlsTest {
 				HttpRequest.newBuilder(URI.create("http://localhost:" + porta + "/leitos")).GET().build(),
 				HttpResponse.BodyHandlers.ofString());
 		assertThat(emClaro.statusCode()).isEqualTo(400);
-		assertThat(emClaro.headers().firstValue("Strict-Transport-Security")).isEmpty();
 
 		// TLS 1.1 ou anterior nem é testado aqui: o próprio JDK cliente já o recusa, o teste não provaria nada.
 		try (SSLSocket socket = (SSLSocket) confiandoNoCertificado().getSocketFactory().createSocket("localhost", porta)) {

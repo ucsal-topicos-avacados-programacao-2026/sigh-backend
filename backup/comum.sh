@@ -17,8 +17,13 @@ agora() { date -u +%Y%m%dT%H%M%SZ; }
 log() { echo "[sigh-backup $(agora)] $*" >&2; }
 
 trabalho=$(mktemp -d)
-# A pasta de trabalho guarda o backup físico em claro e o arquivo da chave: some em qualquer saída.
-trap 'rm -rf "$trabalho"' EXIT INT TERM HUP
+# A pasta de trabalho guarda o backup físico em claro e o arquivo da chave: some em qualquer saída,
+# e o gpg-agent (que guarda a chave na memória) é encerrado junto.
+limpar() { gpgconf --kill gpg-agent 2>/dev/null || true; rm -rf "$trabalho"; }
+trap limpar EXIT
+trap 'limpar; trap - EXIT; exit 130' INT
+trap 'limpar; trap - EXIT; exit 143' TERM
+trap 'limpar; trap - EXIT; exit 129' HUP
 # A chave vai para o gpg por arquivo, nunca pela linha de comando (que aparece no ps).
 printf '%s' "$SIGH_CHAVE_BACKUP" > "$trabalho/.chave"
 export GNUPGHOME="$trabalho/.gnupg"
@@ -39,8 +44,10 @@ cadeia_atual() {
 # derivada com o máximo de iterações). Grava com nome temporário e renomeia só no fim.
 cifrar_pasta() {
     pasta="$1"; destino="$2"
+    # Um .parcial deixado por uma execução interrompida não pode travar as próximas.
+    rm -f "$destino.parcial"
     tar -C "$pasta" -cf - . | gzip -6 \
-        | gpg --batch --quiet --pinentry-mode loopback --passphrase-file "$trabalho/.chave" \
+        | gpg --batch --quiet --no-symkey-cache --pinentry-mode loopback --passphrase-file "$trabalho/.chave" \
             --symmetric --cipher-algo AES256 --s2k-digest-algo SHA512 --s2k-count 65011712 \
             --compress-algo none --output "$destino.parcial"
     mv "$destino.parcial" "$destino"
@@ -50,7 +57,7 @@ cifrar_pasta() {
 decifrar_para() {
     arquivo="$1"; pasta="$2"
     mkdir -p "$pasta"
-    if ! gpg --batch --quiet --pinentry-mode loopback --passphrase-file "$trabalho/.chave" \
+    if ! gpg --batch --quiet --no-symkey-cache --pinentry-mode loopback --passphrase-file "$trabalho/.chave" \
             --decrypt "$arquivo" > "$trabalho/parte.tar.gz" 2>"$trabalho/gpg.log"; then
         log "não foi possível decifrar $(basename "$arquivo"): cópia alterada ou chave errada"
         exit 1

@@ -15,6 +15,7 @@ class IAConfigTest {
 		assertThatCode(() -> IAConfig.validarTransporte("https://ia.exemplo.org", true)).doesNotThrowAnyException();
 		assertThatCode(() -> IAConfig.validarTransporte("http://localhost:11434", true)).doesNotThrowAnyException();
 		assertThatCode(() -> IAConfig.validarTransporte("http://127.0.0.1:11434", true)).doesNotThrowAnyException();
+		assertThatCode(() -> IAConfig.validarTransporte("http://[::1]:11434", true)).doesNotThrowAnyException();
 	}
 
 	@Test
