@@ -3,6 +3,7 @@ package com.sigh.sigh.project.ia.config;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 import java.net.InetAddress;
@@ -140,10 +141,48 @@ class IAConfigTest {
 		}
 	}
 
+	/** A sugestão da triagem espera até tempo-limite; o resumo, em segundo plano, até tempo-limite-resumo. */
+	@Test
+	void clienteDoResumoEsperaMaisQueODaTriagem() throws Exception {
+		HttpServer iaLenta = servidor();
+		iaLenta.createContext("/", troca -> {
+			try {
+				Thread.sleep(1500);
+			} catch (InterruptedException interrompido) {
+				Thread.currentThread().interrupt();
+			}
+			troca.sendResponseHeaders(200, -1);
+			troca.close();
+		});
+		iaLenta.start();
+		try {
+			IAProperties configuracao = new IAProperties("http://127.0.0.1:" + iaLenta.getAddress().getPort(),
+					"modelo-teste", null, 0, Duration.ofMillis(500), 20,
+					new ByteArrayResource("x".getBytes(StandardCharsets.UTF_8)),
+					new ByteArrayResource("x".getBytes(StandardCharsets.UTF_8)), Duration.ofSeconds(5), 5, false);
+			IAConfig config = new IAConfig();
+
+			assertThatThrownBy(() -> config.clienteHttpIA(configuracao, true, "").post().uri("/v1/chat/completions")
+					.body("{}").retrieve().toBodilessEntity())
+					.as("triagem: desiste em 500 ms").isInstanceOf(ResourceAccessException.class);
+			assertThat(config.clienteHttpIAResumo(configuracao, true, "").post().uri("/v1/chat/completions")
+					.body("{}").retrieve().toBodilessEntity().getStatusCode().value())
+					.as("resumo: espera a IA lenta").isEqualTo(200);
+		} finally {
+			iaLenta.stop(0);
+		}
+	}
+
+	@Test
+	void clienteDoResumoTambemSoVaiAosDestinosAutorizados() {
+		assertThatThrownBy(() -> new IAConfig().clienteHttpIAResumo(configuracao("https://ia.externa.com"), true, ""))
+				.isInstanceOf(IllegalStateException.class).hasMessageContaining("sigh.ia.hosts-autorizados");
+	}
+
 	private static IAProperties configuracao(String url) {
 		return new IAProperties(url, "modelo-teste", null, 0, Duration.ofSeconds(5), 20,
 				new ByteArrayResource("x".getBytes(StandardCharsets.UTF_8)),
-				new ByteArrayResource("x".getBytes(StandardCharsets.UTF_8)));
+				new ByteArrayResource("x".getBytes(StandardCharsets.UTF_8)), Duration.ofSeconds(5), 5, false);
 	}
 
 	private static HttpServer servidor() throws Exception {

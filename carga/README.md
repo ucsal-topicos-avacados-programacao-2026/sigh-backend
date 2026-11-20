@@ -156,6 +156,17 @@ A suíte automatizada também restaura com dados fictícios e compara com a orig
    - não peça resumos em paralelo.
 
    Para o sistema: rever o limite e a forma de gerar o resumo (card BE-25).
+
+   **Resolvido no BE-25:** o resumo passou a ser gerado em segundo plano, um por vez, com 120 s de limite. O pedido volta na hora, e o médico consulta até o resumo ficar pronto. A sugestão de risco ganhou 60 s de limite, e o modelo é carregado quando a API sobe. Na nova medição (`medir-ia.sh`, com o pedido medido até o resumo ficar pronto):
+
+   | Medição | Antes (TST-04) | Depois (BE-25) |
+   |---|---|---|
+   | Primeiro pedido, com o modelo carregando | 29,3 s, no limite; numa rodada, 503 | Pronto em 23,6 s |
+   | 5 resumos ao mesmo tempo | 1 de 5 certo | 5 de 5 certos, em fila: prontos em 42, 81, 119, 177 e 249 s |
+   | Resumo, 10 um após o outro | 10 de 10, mediana de 22,9 s | 10 de 10, mediana de 43,3 s |
+   | Sugestão de risco, 10 uma após a outra | 10 de 10, mediana de 9,8 s | 10 de 10, mediana de 13,8 s |
+
+   A nova medição rodou com a máquina mais carregada (outros containers no Docker). A sugestão de risco, que não mudou, também ficou cerca de 40% mais lenta. Por isso a comparação de tempo entre as duas colunas não é justa; a de pedidos certos, sim.
 2. **Pool de conexões.** No estresse, a vazão média foi de 316 req/s com 10 conexões e de 394 req/s com 30. Para a carga do RNF-002 o padrão sobra (110 req/s), então nada foi mudado.
 3. **Dado legado em segmento de WAL reciclado.** O texto dos dados de carga, que entrou em claro direto no banco antes da cifragem, nesta ou numa carga anterior no mesmo servidor (o WAL é do servidor inteiro), foi achado no segmento `00000001000000000000009A`, com o texto de milhares de registros (o grep conta 12.572 linhas com "do paciente"). Esse segmento estava à frente da posição atual do WAL (`…85`): é um arquivo antigo que o PostgreSQL renomeia para reaproveitar, e o conteúdo só some quando ele é sobrescrito. O dado que entra pela API não deixa esse resíduo, porque já chega ao banco cifrado. O README já registra o limite ("WAL de antes da cifragem"); este teste mostra que ele vale também para segmentos reciclados no servidor do banco. Para o sistema: depois da migração, forçar a troca de segmentos até sobrescrever os antigos ou apagar os reciclados com o banco parado, e documentar isso no procedimento (card BE-26).
 
