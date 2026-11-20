@@ -11,6 +11,7 @@ import com.sigh.sigh.project.prontuario.repository.RegistroClinicoRepository;
 import com.sigh.sigh.project.usuario.service.UsuarioService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -46,6 +47,15 @@ public class RegistroAuditoriaService {
 		registro.setJustificativa(acesso.justificativa());
 		registro.setRegistrosAcessados(referenciasDosRegistros(acesso.registrosAcessadosIds()));
 		registroAuditoriaRepository.save(registro);
+	}
+
+	/**
+	 * Registra uma tentativa recusada numa transação própria: a recusa desfaz a transação de quem a
+	 * pediu, e a tentativa precisa ficar na auditoria mesmo assim (BE-24).
+	 */
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
+	public void registrarTentativaRecusada(AcessoProntuarioDTO tentativa) {
+		registrarAcesso(tentativa);
 	}
 
 	private Set<RegistroClinico> referenciasDosRegistros(Set<UUID> ids) {
