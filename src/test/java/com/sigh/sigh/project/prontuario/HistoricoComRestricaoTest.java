@@ -6,6 +6,7 @@ import com.sigh.sigh.project.auditoria.repository.RegistroAuditoriaRepository;
 import com.sigh.sigh.project.ia.dto.CasoResumoDTO;
 import com.sigh.sigh.project.ia.service.ResumoHistoricoService;
 import com.sigh.sigh.project.instituicao.entity.Instituicao;
+import com.sigh.sigh.project.instituicao.repository.InstituicaoRepository;
 import com.sigh.sigh.project.paciente.repository.PacienteRepository;
 import com.sigh.sigh.project.support.Cenario;
 import com.sigh.sigh.project.support.TesteIntegracao;
@@ -63,6 +64,9 @@ class HistoricoComRestricaoTest extends TesteIntegracao {
 
 	@Autowired
 	PacienteRepository pacienteRepository;
+
+	@Autowired
+	InstituicaoRepository instituicaoRepository;
 
 	private Instituicao hospitalA;
 	private Instituicao hospitalB;
@@ -199,6 +203,50 @@ class HistoricoComRestricaoTest extends TesteIntegracao {
 				.andExpect(status().isNoContent());
 		emergencia(atendimentoEmB, medicoB, "MEDICO", justificativa(JUSTIFICATIVA))
 				.andExpect(status().isUnprocessableContent());
+	}
+
+	@Test
+	void categoriaComAcentoMaiusculasOuEspacosDiferentesTambemERestringida() throws Exception {
+		restringirCategoria("  SAUDE   mental ");
+
+		historico(atendimentoEmB, cenario.profissional(hospitalB, Perfil.MEDICO), "MEDICO")
+				.andExpect(jsonPath("$.registros[*].id").value(containsInAnyOrder(asma.toString())));
+		mvc.perform(get("/api/pacientes/{id}/restricoes", pacienteId).with(paciente()))
+				.andExpect(jsonPath("$[0].categoria").value("SAUDE mental"));
+	}
+
+	/** RF-009: o resumo por IA feito antes da restrição não continua mostrando o que ela esconde. */
+	@Test
+	void resumoGeradoAntesDaRestricaoFicaOcultoENaoPodeSerValidado() throws Exception {
+		String medicoB = cenario.profissional(hospitalB, Perfil.MEDICO);
+		CasoResumoDTO caso = resumoHistoricoService.solicitar(atendimentoEmB, medicoB);
+		resumoHistoricoService.concluir(caso.resumoId(), "Asma persistente e episódio depressivo grave.");
+		mvc.perform(get("/resumos/{id}", caso.resumoId()).with(user(medicoB).roles("MEDICO")))
+				.andExpect(jsonPath("$.texto").value("Asma persistente e episódio depressivo grave."));
+
+		restringirCategoria("Saúde mental");
+
+		mvc.perform(get("/resumos/{id}", caso.resumoId()).with(user(medicoB).roles("MEDICO")))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.texto").doesNotExist())
+				.andExpect(jsonPath("$.registrosDeOrigem.length()").value(0))
+				.andExpect(jsonPath("$.aviso").value(org.hamcrest.Matchers.containsString("Resumo oculto")));
+		mvc.perform(post("/resumos/{id}/validacao", caso.resumoId()).with(user(medicoB).roles("MEDICO")).with(csrf()))
+				.andExpect(status().isUnprocessableContent());
+	}
+
+	@Test
+	void emergenciaRecusaJustificativaSoDeEspacosEInstituicaoDescredenciada() throws Exception {
+		String medicoB = cenario.profissional(hospitalB, Perfil.MEDICO);
+		long acessosAntes = registroAuditoriaRepository.count();
+		emergencia(atendimentoEmB, medicoB, "MEDICO", justificativa(" ".repeat(25) + "x"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.campos.justificativa").exists());
+
+		hospitalB.setCredenciada(false);
+		instituicaoRepository.save(hospitalB);
+		emergencia(atendimentoEmB, medicoB, "MEDICO", justificativa(JUSTIFICATIVA)).andExpect(status().isUnprocessableContent());
+		assertThat(registroAuditoriaRepository.count()).isEqualTo(acessosAntes);
 	}
 
 	/** BE-14: sem consentimento amplo, cada instituição vê só o que ela mesma registrou. */

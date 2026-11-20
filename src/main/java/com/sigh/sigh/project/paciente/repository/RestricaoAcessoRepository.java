@@ -1,6 +1,7 @@
 package com.sigh.sigh.project.paciente.repository;
 
 import com.sigh.sigh.project.paciente.entity.RestricaoAcesso;
+import com.sigh.sigh.project.prontuario.repository.RegistroClinicoRepository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -22,11 +23,10 @@ public interface RestricaoAcessoRepository extends JpaRepository<RestricaoAcesso
 	boolean existeVigenteDoRegistro(@Param("prontuarioId") UUID prontuarioId, @Param("registroId") UUID registroId,
 			@Param("agora") LocalDateTime agora);
 
-	@Query("""
-			select count(ra) > 0 from RestricaoAcesso ra
-			where ra.prontuario.id = :prontuarioId and lower(ra.categoriaAlvo) = lower(:categoria)
-			  and ra.inicioEm <= :agora and (ra.fimEm is null or ra.fimEm > :agora)
-			""")
+	@Query("select count(ra) > 0 from RestricaoAcesso ra where ra.prontuario.id = :prontuarioId"
+			+ " and ra.inicioEm <= :agora and (ra.fimEm is null or ra.fimEm > :agora)"
+			+ " and " + RegistroClinicoRepository.NORMALIZAR + "ra.categoriaAlvo" + RegistroClinicoRepository.FIM_NORMALIZAR
+			+ " = " + RegistroClinicoRepository.NORMALIZAR + ":categoria" + RegistroClinicoRepository.FIM_NORMALIZAR)
 	boolean existeVigenteDaCategoria(@Param("prontuarioId") UUID prontuarioId, @Param("categoria") String categoria,
 			@Param("agora") LocalDateTime agora);
 }

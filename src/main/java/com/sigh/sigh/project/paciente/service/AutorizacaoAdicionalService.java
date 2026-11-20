@@ -103,7 +103,7 @@ public class AutorizacaoAdicionalService {
 		if (alvo.registro() != null) {
 			return vigente.getRegistroAlvo() != null && vigente.getRegistroAlvo().getId().equals(alvo.registro().getId());
 		}
-		return vigente.getCategoriaAlvo() != null && vigente.getCategoriaAlvo().equalsIgnoreCase(alvo.categoria());
+		return CategoriaDeInformacao.mesma(vigente.getCategoriaAlvo(), alvo.categoria());
 	}
 
 	/** Hora atual na mesma precisão do PostgreSQL (microssegundos). */

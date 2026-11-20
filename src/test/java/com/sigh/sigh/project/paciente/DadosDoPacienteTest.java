@@ -1,6 +1,7 @@
 package com.sigh.sigh.project.paciente;
 
 import com.jayway.jsonpath.JsonPath;
+import com.sigh.sigh.project.auditoria.repository.RegistroAuditoriaRepository;
 import com.sigh.sigh.project.instituicao.entity.Instituicao;
 import com.sigh.sigh.project.paciente.entity.Consentimento;
 import com.sigh.sigh.project.paciente.repository.ConsentimentoRepository;
@@ -40,6 +41,9 @@ class DadosDoPacienteTest extends TesteIntegracao {
 
 	@Autowired
 	TransactionTemplate transacao;
+
+	@Autowired
+	RegistroAuditoriaRepository registroAuditoriaRepository;
 
 	private Instituicao hospital;
 	private UUID pacienteId;
@@ -134,6 +138,22 @@ class DadosDoPacienteTest extends TesteIntegracao {
 		relogio.avancar(Duration.ofDays(2));
 		comoPaciente(get("/api/pacientes/{id}/historico", pacienteId), representante).andExpect(status().isForbidden());
 		comoPaciente(get("/api/pacientes/gerenciados"), representante).andExpect(jsonPath("$.length()").value(0));
+	}
+
+	/** A leitura do prontuário pelo representante fica na auditoria; a do próprio titular, não. */
+	@Test
+	void leituraPeloRepresentanteFicaNaAuditoria() throws Exception {
+		LocalDateTime agora = LocalDateTime.now(relogio);
+		String representante = cenario.representante(pacienteId, agora.minusDays(1), null);
+		long antes = registroAuditoriaRepository.count();
+
+		comoPaciente(get("/api/pacientes/{id}/historico", pacienteId), titular).andExpect(status().isOk());
+		assertThat(registroAuditoriaRepository.count()).isEqualTo(antes);
+
+		comoPaciente(get("/api/pacientes/{id}/historico", pacienteId), representante).andExpect(status().isOk());
+		comoPaciente(get("/auditoria/meus-acessos"), titular)
+				.andExpect(jsonPath("$.content[0].finalidade").value("Consulta do histórico pelo representante legal"))
+				.andExpect(jsonPath("$.content[0].perfil").value("PACIENTE"));
 	}
 
 	@Test

@@ -103,10 +103,10 @@ class RegistroClinicoRepositoryTest {
 	}
 
 	@Test
-	void categoriaRestritaValeSemDiferenciarMaiusculas() {
+	void categoriaRestritaValeSemDiferenciarMaiusculasAcentosEEspacos() {
 		salvarRegistro("Asma", "Clínica geral", 3);
 		salvarRegistro("Ansiedade", "Saúde mental", 2);
-		restringir(null, "SAÚDE MENTAL", null);
+		restringir(null, "  saude   MENTAL ", null);
 
 		assertThat(conteudosDoHistorico()).containsExactly("Asma");
 		assertThat(registroClinicoRepository.contarRestritosOcultos(prontuario.getId(), instituicao.getId(), true, AGORA))

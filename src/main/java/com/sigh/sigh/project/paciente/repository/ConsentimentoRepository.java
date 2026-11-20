@@ -36,7 +36,10 @@ public interface ConsentimentoRepository extends JpaRepository<Consentimento, UU
 			where c.paciente.id = :pacienteId
 			  and c.tipo = com.sigh.sigh.project.paciente.entity.TipoConsentimento.ADICIONAL
 			  and c.decisao = com.sigh.sigh.project.paciente.entity.DecisaoConsentimento.AUTORIZADO
-			  and not exists (select 1 from Consentimento revogacao where revogacao.anterior = c)
+			  and not exists (select 1 from Consentimento revogacao
+				where revogacao.anterior = c
+				  and revogacao.tipo = com.sigh.sigh.project.paciente.entity.TipoConsentimento.ADICIONAL
+				  and revogacao.decisao = com.sigh.sigh.project.paciente.entity.DecisaoConsentimento.REVOGADO)
 			order by c.vigenteDesde desc
 			""")
 	List<Consentimento> autorizacoesAdicionaisVigentes(@Param("pacienteId") UUID pacienteId);

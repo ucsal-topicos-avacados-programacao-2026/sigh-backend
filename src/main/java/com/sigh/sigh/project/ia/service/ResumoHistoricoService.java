@@ -85,6 +85,9 @@ public class ResumoHistoricoService {
 	@Transactional
 	public ResumoHistoricoResponseDTO validar(UUID resumoId, String loginMedico) {
 		ResumoHistoricoIA resumo = buscarComVinculo(resumoId, loginMedico);
+		if (!fontesContinuamVisiveis(resumo)) {
+			throw new RegraNegocioException("O resumo usa informação restrita depois da geração. Gere um novo resumo.");
+		}
 		if (resumo.getStatus() != StatusResumo.GERADO) {
 			throw new RegraNegocioException("Só um resumo gerado pode ser validado.");
 		}
@@ -96,6 +99,9 @@ public class ResumoHistoricoService {
 	@Transactional
 	public ResumoHistoricoResponseDTO consultar(UUID resumoId, String loginMedico) {
 		ResumoHistoricoIA resumo = buscarComVinculo(resumoId, loginMedico);
+		if (!fontesContinuamVisiveis(resumo)) {
+			return ResumoHistoricoResponseDTO.oculto(resumo);
+		}
 		registrarConsulta(resumo, loginMedico);
 		return ResumoHistoricoResponseDTO.de(resumo);
 	}
@@ -105,6 +111,11 @@ public class ResumoHistoricoService {
 		ResumoHistoricoIA resumo = buscar(resumoId);
 		vinculoService.exigirVinculoAtivo(loginMedico, resumo.getAtendimento().getInstituicao().getId(), Perfil.MEDICO);
 		return resumo;
+	}
+
+	private boolean fontesContinuamVisiveis(ResumoHistoricoIA resumo) {
+		Set<UUID> fontes = resumo.getFontes().stream().map(RegistroClinico::getId).collect(Collectors.toSet());
+		return historicoAutorizadoService.continuamVisiveis(resumo.getAtendimento(), fontes);
 	}
 
 	private ResumoHistoricoIA buscar(UUID resumoId) {

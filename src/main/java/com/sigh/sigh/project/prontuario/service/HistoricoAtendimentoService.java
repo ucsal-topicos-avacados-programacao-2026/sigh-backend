@@ -1,5 +1,6 @@
 package com.sigh.sigh.project.prontuario.service;
 
+import com.sigh.sigh.project.comum.erro.DadosInvalidosException;
 import com.sigh.sigh.project.comum.erro.RecursoNaoEncontradoException;
 import com.sigh.sigh.project.comum.erro.RegraNegocioException;
 import com.sigh.sigh.project.prontuario.dto.ConsultaHistoricoDTO;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -25,6 +27,7 @@ public class HistoricoAtendimentoService {
 
 	static final String FINALIDADE_CONSULTA = "Consulta do histórico no atendimento";
 	static final String FINALIDADE_EMERGENCIA = "Acesso de emergência";
+	static final int JUSTIFICATIVA_MINIMA = 20;
 
 	private final AtendimentoRepository atendimentoRepository;
 	private final HistoricoAutorizadoService historicoAutorizadoService;
@@ -61,8 +64,15 @@ public class HistoricoAtendimentoService {
 		if (atendimento.getStatus() == StatusAtendimento.ENCERRADO) {
 			throw new RegraNegocioException("Acesso de emergência só vale para atendimento em andamento.");
 		}
+		if (!atendimento.getInstituicao().isCredenciada()) {
+			throw new RegraNegocioException("A instituição não está credenciada na rede.");
+		}
+		String texto = justificativa.strip();
+		if (texto.length() < JUSTIFICATIVA_MINIMA) {
+			throw new DadosInvalidosException(Map.of("justificativa", "descreva a emergência com 20 a 2000 caracteres"));
+		}
 		List<RegistroClinico> registros = historicoAutorizadoService.consultarEmEmergencia(atendimento,
-				new ConsultaHistoricoDTO(login, perfil, FINALIDADE_EMERGENCIA, limiteDeRegistros), justificativa.strip());
+				new ConsultaHistoricoDTO(login, perfil, FINALIDADE_EMERGENCIA, limiteDeRegistros), texto);
 		return new HistoricoDoAtendimentoDTO(
 				paraDTO(registros, historicoAutorizadoService.restritos(atendimento.getProntuario())), false, true);
 	}
