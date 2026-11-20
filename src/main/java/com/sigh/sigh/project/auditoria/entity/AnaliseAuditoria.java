@@ -1,7 +1,9 @@
 package com.sigh.sigh.project.auditoria.entity;
 
+import com.sigh.sigh.project.comum.cripto.TextoCifrado;
 import com.sigh.sigh.project.usuario.entity.Usuario;
 import jakarta.persistence.*;
+import jakarta.persistence.Convert;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -29,6 +31,7 @@ public class AnaliseAuditoria {
 	@Enumerated(EnumType.STRING)
 	private ConclusaoAnalise conclusao;
 
+	@Convert(converter = TextoCifrado.class)
 	private String descricao;
 
 	@ManyToOne(fetch = FetchType.LAZY)

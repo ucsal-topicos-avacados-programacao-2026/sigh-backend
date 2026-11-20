@@ -1,6 +1,8 @@
 package com.sigh.sigh.project.usuario.entity;
 
+import com.sigh.sigh.project.comum.cripto.TextoCifrado;
 import jakarta.persistence.*;
+import jakarta.persistence.Convert;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -22,6 +24,8 @@ public class Usuario {
 	private String nome;
 	private String senhaHash;
 	private boolean mfaHabilitado;
+	/** Semente do TOTP: quem a tem gera os códigos do segundo fator, então fica cifrada (RNF-004, RNF-005). */
+	@Convert(converter = TextoCifrado.class)
 	private String mfaSegredo;
 
 	@ElementCollection(fetch = FetchType.EAGER)
