@@ -13,6 +13,7 @@ import com.sigh.sigh.project.prontuario.repository.RegistroClinicoRepository;
 import com.sigh.sigh.project.support.RelogioDeTeste;
 import com.sigh.sigh.project.usuario.entity.Usuario;
 import com.sigh.sigh.project.usuario.service.UsuarioService;
+import com.sigh.sigh.project.usuario.service.VinculoService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -54,6 +55,9 @@ class AtendimentoServiceTest {
 
 	@Spy
 	private Clock clock = RelogioDeTeste.em(AGORA);
+
+	@Mock
+	private VinculoService vinculoService;
 
 	@InjectMocks
 	private AtendimentoService atendimentoService;
@@ -106,7 +110,7 @@ class AtendimentoServiceTest {
 		Atendimento atendimento = atendimentoComStatus(StatusAtendimento.EM_ATENDIMENTO);
 		when(atendimentoRepository.findById(ATENDIMENTO_ID)).thenReturn(Optional.of(atendimento));
 
-		atendimentoService.encerrar(ATENDIMENTO_ID);
+		atendimentoService.encerrar(ATENDIMENTO_ID, LOGIN_MEDICO);
 
 		assertThat(atendimento.getStatus()).isEqualTo(StatusAtendimento.ENCERRADO);
 	}
@@ -116,7 +120,7 @@ class AtendimentoServiceTest {
 		when(atendimentoRepository.findById(ATENDIMENTO_ID))
 				.thenReturn(Optional.of(atendimentoComStatus(StatusAtendimento.ENCERRADO)));
 
-		assertThatThrownBy(() -> atendimentoService.encerrar(ATENDIMENTO_ID))
+		assertThatThrownBy(() -> atendimentoService.encerrar(ATENDIMENTO_ID, LOGIN_MEDICO))
 				.isInstanceOf(RegraNegocioException.class);
 	}
 

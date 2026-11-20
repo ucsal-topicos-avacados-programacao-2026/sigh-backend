@@ -15,4 +15,8 @@ public interface OcupacaoLeitoRepository extends JpaRepository<OcupacaoLeito, UU
 			where o.internacao.id = :internacaoId and o.fimEm is null
 			""")
 	Optional<OcupacaoLeito> buscarOcupacaoAtual(UUID internacaoId);
+
+	/** Instituição onde o paciente está internado agora (a do leito ocupado). */
+	@Query("select o.leito.instituicao.id from OcupacaoLeito o where o.internacao.id = :internacaoId and o.fimEm is null")
+	Optional<UUID> instituicaoDaOcupacaoAtual(UUID internacaoId);
 }

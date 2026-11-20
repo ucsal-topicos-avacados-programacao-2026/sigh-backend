@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.security.Principal;
 import java.util.UUID;
 
 @RestController
@@ -28,19 +29,19 @@ public class InternacaoController {
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	public InternacaoResponseDTO internar(@RequestBody @Valid InternacaoRequestDTO dados) {
-		return internacaoService.internar(dados);
+	public InternacaoResponseDTO internar(@RequestBody @Valid InternacaoRequestDTO dados, Principal usuario) {
+		return internacaoService.internar(dados, usuario.getName());
 	}
 
 	@PostMapping("/{internacaoId}/transferencia")
 	public InternacaoResponseDTO transferir(@PathVariable UUID internacaoId,
-			@RequestBody @Valid TransferenciaRequestDTO dados) {
-		return internacaoService.transferir(internacaoId, dados.leitoDestinoId());
+			@RequestBody @Valid TransferenciaRequestDTO dados, Principal usuario) {
+		return internacaoService.transferir(internacaoId, dados.leitoDestinoId(), usuario.getName());
 	}
 
 	@PostMapping("/{internacaoId}/alta")
 	public InternacaoResponseDTO darAlta(@PathVariable UUID internacaoId,
-			@RequestBody @Valid AltaRequestDTO dados) {
-		return internacaoService.darAlta(internacaoId, dados.resumoAltaId());
+			@RequestBody @Valid AltaRequestDTO dados, Principal usuario) {
+		return internacaoService.darAlta(internacaoId, dados.resumoAltaId(), usuario.getName());
 	}
 }

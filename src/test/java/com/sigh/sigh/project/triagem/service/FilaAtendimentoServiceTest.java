@@ -9,6 +9,7 @@ import com.sigh.sigh.project.triagem.dto.PacienteNaFilaDTO;
 import com.sigh.sigh.project.triagem.entity.CorRisco;
 import com.sigh.sigh.project.triagem.entity.Triagem;
 import com.sigh.sigh.project.triagem.repository.TriagemRepository;
+import com.sigh.sigh.project.usuario.service.VinculoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +35,9 @@ class FilaAtendimentoServiceTest {
 	@Mock
 	private TriagemRepository triagemRepository;
 
+	@Mock
+	private VinculoService vinculoService;
+
 	private final Clock clock = RelogioDeTeste.em(LocalDateTime.of(2026, 11, 19, 10, 30));
 	private FilaAtendimentoService filaAtendimentoService;
 
@@ -41,7 +45,7 @@ class FilaAtendimentoServiceTest {
 	public void configurarTemposMaximos() {
 		TempoMaximoEsperaProperties tempos = new TempoMaximoEsperaProperties(
 				Duration.ZERO, Duration.ofMinutes(10), Duration.ofMinutes(60), Duration.ofMinutes(120), Duration.ofMinutes(240));
-		filaAtendimentoService = new FilaAtendimentoService(triagemRepository, tempos, clock);
+		filaAtendimentoService = new FilaAtendimentoService(triagemRepository, tempos, clock, vinculoService);
 	}
 
 	@Test
@@ -52,7 +56,7 @@ class FilaAtendimentoServiceTest {
 				.thenReturn(new PageImpl<>(List.of(laranjaAtrasado, amareloNoPrazo)));
 
 		List<PacienteNaFilaDTO> fila = filaAtendimentoService
-				.consultarFila(INSTITUICAO_ID, Pageable.unpaged()).getContent();
+				.consultarFila(INSTITUICAO_ID, "enfermeira.teste", Pageable.unpaged()).getContent();
 
 		assertThat(fila).extracting(PacienteNaFilaDTO::tempoMaximoExcedido).containsExactly(true, false);
 		assertThat(fila).extracting(PacienteNaFilaDTO::minutosDeEspera).containsExactly(30L, 30L);

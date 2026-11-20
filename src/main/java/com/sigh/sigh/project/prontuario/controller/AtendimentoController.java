@@ -34,7 +34,7 @@ public class AtendimentoController {
 
 	@PostMapping("/encerramento")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
-	public void encerrar(@PathVariable UUID atendimentoId) {
-		atendimentoService.encerrar(atendimentoId);
+	public void encerrar(@PathVariable UUID atendimentoId, Principal medico) {
+		atendimentoService.encerrar(atendimentoId, medico.getName());
 	}
 }

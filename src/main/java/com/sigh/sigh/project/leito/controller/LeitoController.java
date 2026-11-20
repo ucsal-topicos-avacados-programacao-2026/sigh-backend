@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.security.Principal;
 import java.util.UUID;
 
 @RestController
@@ -32,8 +33,8 @@ public class LeitoController {
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	public LeitoResponseDTO cadastrar(@RequestBody @Valid LeitoRequestDTO dados) {
-		return leitoService.cadastrar(dados);
+	public LeitoResponseDTO cadastrar(@RequestBody @Valid LeitoRequestDTO dados, Principal usuario) {
+		return leitoService.cadastrar(dados, usuario.getName());
 	}
 
 	@GetMapping
@@ -43,7 +44,7 @@ public class LeitoController {
 
 	@PatchMapping("/{leitoId}/status")
 	public LeitoResponseDTO alterarStatus(@PathVariable UUID leitoId,
-			@RequestBody @Valid AlteracaoStatusLeitoRequestDTO dados) {
-		return leitoService.alterarStatus(leitoId, dados.status());
+			@RequestBody @Valid AlteracaoStatusLeitoRequestDTO dados, Principal usuario) {
+		return leitoService.alterarStatus(leitoId, dados.status(), usuario.getName());
 	}
 }
