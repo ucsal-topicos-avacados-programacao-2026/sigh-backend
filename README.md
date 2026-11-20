@@ -27,6 +27,24 @@ O último caso é o controle positivo: como a única diferença entre eles é o 
 - a regra de acesso não é `hasRole` ou `hasAnyRole`, que são as que ele sabe ler;
 - a rota não declara o método HTTP.
 
+## Transferência entre instituições (RF-006)
+
+A ERS (Processo 2, Gestão de Leitos) diz que, sem leito na unidade e com leito em outra da rede, "solicita-se transferência para outra unidade da rede", e a unidade de destino executa o próprio processo. Por isso (BE-21):
+- **Na mesma instituição:** a transferência entre leitos continua direta (`POST /internacoes/{id}/transferencia`). Para leito de outra instituição, essa rota recusa.
+- **Para outra instituição:** o administrativo da origem pede (`POST /internacoes/{id}/solicitacoes-transferencia`, com a instituição de destino e a categoria do leito). O paciente continua no leito atual.
+- **O destino decide:**
+  - o administrativo do destino vê os pedidos pendentes (`GET /solicitacoes-transferencia/recebidas?instituicaoId=`, do mais antigo para o mais novo);
+  - ele aceita escolhendo um leito livre dele, da categoria pedida (`POST /solicitacoes-transferencia/{id}/aceite`). Aí o paciente ocupa esse leito, e o da origem vai para higienização;
+  - ou recusa com motivo (`.../recusa`), e o paciente fica na origem.
+- **A origem** acompanha os pedidos que fez, com o status e o motivo da recusa (`GET /solicitacoes-transferencia/enviadas?instituicaoId=`). Ela pode cancelar enquanto o pedido estiver pendente (`.../cancelamento`).
+- **Alta:** a alta na origem cancela o pedido pendente. Nesse caso, o decisor registrado é quem deu a alta, sem motivo.
+- **Concorrência:** a origem e o destino podem agir ao mesmo tempo sobre o mesmo paciente. Toda operação que muda o leito de uma internação trava a internação primeiro, sempre na mesma ordem: internação, pedido, leito. Assim, o paciente nunca fica com dois leitos, nem com leito ocupado depois da alta.
+- **Credenciamento:** o destino precisa estar credenciado tanto no pedido quanto no aceite.
+- **Um pedido pendente por internação:** a regra vale também no banco, com um índice único parcial.
+- **O prontuário continua único.** A internação é a mesma; só mudam o leito e a instituição. O pedido mostra ao destino só o nome do paciente.
+
+Os testes estão em `TransferenciaEntreInstituicoesTest`, e as rotas novas, no `VinculoEmTodaRotaTest`.
+
 ## Acesso de emergência (RF-010, RF-011)
 
 Em emergência, médico ou enfermeiro com vínculo no hospital do atendimento vê também o que o paciente restringiu (`POST /atendimentos/{id}/historico/emergencia`). Antes de qualquer dado aparecer, a justificativa (mínimo de 20 caracteres) é gravada na auditoria, e o paciente vê o acesso marcado como emergência.
