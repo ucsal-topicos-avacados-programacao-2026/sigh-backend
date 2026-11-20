@@ -1,0 +1,4 @@
+# Agenda da rotina de backup (RNF-007), no horário de menor uso. Fuso do servidor de backup.
+# Domingo: backup completo (nova cadeia). Segunda a sábado: incremental sobre o último backup.
+0 2 * * 0   /opt/sigh-backup/backup-completo.sh    >> /var/log/sigh-backup.log 2>&1
+0 2 * * 1-6 /opt/sigh-backup/backup-incremental.sh >> /var/log/sigh-backup.log 2>&1
