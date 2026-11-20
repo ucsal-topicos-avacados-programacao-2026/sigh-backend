@@ -48,6 +48,12 @@ public class ConsultaAuditoriaService {
 				paginacao);
 	}
 
+	/** Acessos de emergência que o auditor ainda precisa analisar (BE-18). */
+	@Transactional(readOnly = true)
+	public Page<RegistroAuditoriaResponseDTO> consultarEmergenciasPendentes(Pageable paginacao) {
+		return registroAuditoriaRepository.buscarEmergenciasSemAnalise(paginacao);
+	}
+
 	@Transactional(readOnly = true)
 	public List<IndicadorInstituicaoDTO> consultarIndicadores(PeriodoDTO periodo) {
 		validar(periodo);

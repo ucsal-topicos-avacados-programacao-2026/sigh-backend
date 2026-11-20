@@ -12,6 +12,7 @@ import com.sigh.sigh.project.support.Cenario;
 import com.sigh.sigh.project.support.TesteIntegracao;
 import com.sigh.sigh.project.triagem.dto.SinaisVitaisDTO;
 import com.sigh.sigh.project.triagem.dto.TriagemRequestDTO;
+import com.sigh.sigh.project.triagem.entity.CorRisco;
 import com.sigh.sigh.project.triagem.service.ContextoTriagemService;
 import com.sigh.sigh.project.triagem.service.TriagemService;
 import com.sigh.sigh.project.usuario.entity.Perfil;
@@ -157,6 +158,7 @@ class HistoricoComRestricaoTest extends TesteIntegracao {
 	/** Critério de aceite: acesso emergencial só com justificativa, e identificado no histórico de acessos. */
 	@Test
 	void emergenciaMostraORestritoDepoisDeRegistrarAJustificativa() throws Exception {
+		cenario.classificarRisco(atendimentoEmB, hospitalB, CorRisco.VERMELHO);
 		restringirCategoria("Saúde mental");
 		String enfermeiroB = cenario.profissional(hospitalB, Perfil.ENFERMEIRO);
 		long acessosAntes = registroAuditoriaRepository.count();
@@ -191,6 +193,7 @@ class HistoricoComRestricaoTest extends TesteIntegracao {
 
 	@Test
 	void emergenciaExigeVinculoNaInstituicaoEAtendimentoEmAndamento() throws Exception {
+		cenario.classificarRisco(atendimentoEmB, hospitalB, CorRisco.VERMELHO);
 		Instituicao outro = cenario.instituicao(true);
 		emergencia(atendimentoEmB, cenario.profissional(outro, Perfil.MEDICO), "MEDICO", justificativa(JUSTIFICATIVA))
 				.andExpect(status().isForbidden());
@@ -237,6 +240,7 @@ class HistoricoComRestricaoTest extends TesteIntegracao {
 
 	@Test
 	void emergenciaRecusaJustificativaSoDeEspacosEInstituicaoDescredenciada() throws Exception {
+		cenario.classificarRisco(atendimentoEmB, hospitalB, CorRisco.VERMELHO);
 		String medicoB = cenario.profissional(hospitalB, Perfil.MEDICO);
 		long acessosAntes = registroAuditoriaRepository.count();
 		emergencia(atendimentoEmB, medicoB, "MEDICO", justificativa(" ".repeat(25) + "x"))
