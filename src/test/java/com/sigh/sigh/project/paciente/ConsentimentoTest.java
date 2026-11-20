@@ -7,6 +7,14 @@ import com.sigh.sigh.project.paciente.entity.Paciente;
 import com.sigh.sigh.project.paciente.repository.ConsentimentoRepository;
 import com.sigh.sigh.project.paciente.repository.PacienteRepository;
 import com.sigh.sigh.project.paciente.service.ConsentimentoService;
+import com.sigh.sigh.project.prontuario.dto.ConsultaHistoricoDTO;
+import com.sigh.sigh.project.prontuario.entity.RegistroClinico;
+import com.sigh.sigh.project.prontuario.entity.TipoRegistro;
+import com.sigh.sigh.project.prontuario.repository.AtendimentoRepository;
+import com.sigh.sigh.project.prontuario.repository.ProntuarioRepository;
+import com.sigh.sigh.project.prontuario.repository.RegistroClinicoRepository;
+import com.sigh.sigh.project.prontuario.service.HistoricoAutorizadoService;
+import com.sigh.sigh.project.usuario.entity.Perfil;
 import com.sigh.sigh.project.support.Cenario;
 import com.sigh.sigh.project.support.TesteIntegracao;
 import org.junit.jupiter.api.Test;
@@ -45,6 +53,41 @@ class ConsentimentoTest extends TesteIntegracao {
 
 	@Autowired
 	TransactionTemplate transacao;
+
+	@Autowired
+	HistoricoAutorizadoService historicoAutorizadoService;
+
+	@Autowired
+	AtendimentoRepository atendimentoRepository;
+
+	@Autowired
+	ProntuarioRepository prontuarioRepository;
+
+	@Autowired
+	RegistroClinicoRepository registroClinicoRepository;
+
+	/**
+	 * RN-007 no histórico compartilhado (BE-06): depois da revogação, a instituição que já tinha
+	 * atendido o paciente continua vendo o histórico; a que só atende depois não vê nada.
+	 */
+	@Test
+	void historicoCompartilhadoRespeitaARevogacaoApenasParaNovasInstituicoes() throws Exception {
+		Instituicao hospitalA = cenario.instituicao(true);
+		Instituicao hospitalC = cenario.instituicao(true);
+		String cpf = Cenario.novoCpf();
+		MvcResult primeira = admissao(hospitalA, cpf, "AUTORIZADO");
+		UUID pacienteId = uuid(primeira, "$.pacienteId");
+		UUID atendimentoEmA = uuid(primeira, "$.atendimentoId");
+		UUID registro = registroClinico(uuid(primeira, "$.prontuarioId"), hospitalA);
+
+		relogio.avancar(Duration.ofDays(1));
+		mvc.perform(decisao(cenario.contaDoPaciente(pacienteId), "REVOGADO")).andExpect(status().isCreated());
+		relogio.avancar(Duration.ofHours(2));
+		UUID atendimentoEmC = uuid(admissao(hospitalC, cpf, "AUTORIZADO"), "$.atendimentoId");
+
+		assertThat(historicoVistoNo(atendimentoEmA)).containsExactly(registro);
+		assertThat(historicoVistoNo(atendimentoEmC)).isEmpty();
+	}
 
 	@Test
 	void pacienteConsultaOProprioConsentimento() throws Exception {
@@ -238,6 +281,36 @@ class ConsentimentoTest extends TesteIntegracao {
 						.content(novoCadastro(cpf, instituicao.getId(), consentimento)))
 				.andExpect(status().isCreated()).andReturn();
 		return uuid(resultado, "$.pacienteId");
+	}
+
+	private MvcResult admissao(Instituicao instituicao, String cpf, String consentimento) throws Exception {
+		return mvc.perform(post("/api/pacientes/admissoes")
+						.with(user(cenario.administrativo(instituicao)).roles("ADMINISTRATIVO")).with(csrf())
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(novoCadastro(cpf, instituicao.getId(), consentimento)))
+				.andExpect(status().isCreated()).andReturn();
+	}
+
+	private UUID registroClinico(UUID prontuarioId, Instituicao origem) {
+		return transacao.execute(status -> {
+			RegistroClinico registro = new RegistroClinico();
+			registro.setProntuario(prontuarioRepository.getReferenceById(prontuarioId));
+			registro.setTipo(TipoRegistro.DIAGNOSTICO);
+			registro.setCriadoEm(LocalDateTime.of(2026, 11, 10, 13, 0));
+			registro.setConteudo("Registro fictício");
+			registro.setCategoriaInformacao("Clínica geral");
+			registro.setAutor(cenario.usuario(Perfil.MEDICO));
+			registro.setOrigem(origem);
+			return registroClinicoRepository.save(registro).getId();
+		});
+	}
+
+	private List<UUID> historicoVistoNo(UUID atendimentoId) {
+		String medico = cenario.usuario(Perfil.MEDICO).getLogin();
+		ConsultaHistoricoDTO consulta = new ConsultaHistoricoDTO(medico, Perfil.MEDICO, "Teste", 20);
+		return transacao.execute(status -> historicoAutorizadoService
+				.consultar(atendimentoRepository.findById(atendimentoId).orElseThrow(), consulta)
+				.stream().map(RegistroClinico::getId).toList());
 	}
 
 	private MockHttpServletRequestBuilder decisao(String login, String decisao) {

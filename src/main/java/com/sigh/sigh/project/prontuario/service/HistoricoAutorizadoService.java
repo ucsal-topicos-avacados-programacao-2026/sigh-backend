@@ -2,9 +2,7 @@ package com.sigh.sigh.project.prontuario.service;
 
 import com.sigh.sigh.project.auditoria.dto.AcessoProntuarioDTO;
 import com.sigh.sigh.project.auditoria.service.RegistroAuditoriaService;
-import com.sigh.sigh.project.paciente.entity.DecisaoConsentimento;
-import com.sigh.sigh.project.paciente.entity.TipoConsentimento;
-import com.sigh.sigh.project.paciente.repository.ConsentimentoRepository;
+import com.sigh.sigh.project.paciente.service.ConsentimentoService;
 import com.sigh.sigh.project.prontuario.dto.ConsultaHistoricoDTO;
 import com.sigh.sigh.project.prontuario.entity.Atendimento;
 import com.sigh.sigh.project.prontuario.entity.Prontuario;
@@ -25,14 +23,17 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class HistoricoAutorizadoService {
 
-	private final ConsentimentoRepository consentimentoRepository;
+	private final ConsentimentoService consentimentoService;
 	private final RegistroClinicoRepository registroClinicoRepository;
 	private final RegistroAuditoriaService registroAuditoriaService;
 
 	@Transactional
 	public List<RegistroClinico> consultar(Atendimento atendimento, ConsultaHistoricoDTO consulta) {
 		Prontuario prontuario = atendimento.getProntuario();
-		if (!pacienteAutorizouCompartilhamento(prontuario.getPaciente().getId())) {
+		// Regra de consentimento única para a rede, inclusive a revogação (RN-007): quem já tinha
+		// atendido o paciente até a revogação continua vendo o histórico; instituições novas, não.
+		if (!consentimentoService.podeCompartilharCom(prontuario.getPaciente().getId(),
+				atendimento.getInstituicao().getId())) {
 			return List.of();
 		}
 		List<RegistroClinico> historico = registroClinicoRepository.buscarHistoricoSemRestricao(
@@ -41,12 +42,6 @@ public class HistoricoAutorizadoService {
 			registrarAcesso(atendimento, consulta, historico);
 		}
 		return historico;
-	}
-
-	private boolean pacienteAutorizouCompartilhamento(UUID pacienteId) {
-		return consentimentoRepository.findFirstByPacienteIdAndTipoOrderByVersaoDesc(pacienteId, TipoConsentimento.AMPLO)
-				.map(consentimento -> consentimento.getDecisao() == DecisaoConsentimento.AUTORIZADO)
-				.orElse(false);
 	}
 
 	private void registrarAcesso(Atendimento atendimento, ConsultaHistoricoDTO consulta, List<RegistroClinico> historico) {
