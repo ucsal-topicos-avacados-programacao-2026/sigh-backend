@@ -8,8 +8,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -19,6 +21,9 @@ import java.util.UUID;
  *
  * <p>A justificativa da auditoria fica de fora: a tabela é imutável (RN-006), então só os registros
  * novos saem cifrados.
+ *
+ * <p>Depois de cifrar, a tabela passa por VACUUM FULL: o UPDATE deixa a versão antiga da linha, em
+ * claro, nos arquivos do banco até ela ser reescrita, e o backup físico copiaria esses arquivos.
  */
 @Component
 public class CifragemDeDadosLegados implements ApplicationRunner {
@@ -37,7 +42,9 @@ public class CifragemDeDadosLegados implements ApplicationRunner {
 			new String[] {"triagem", "frequencia_respiratoria"},
 			new String[] {"triagem", "temperatura"},
 			new String[] {"triagem", "saturacao_oxigenio"},
-			new String[] {"resumo_historico_ia", "texto"});
+			new String[] {"resumo_historico_ia", "texto"},
+			new String[] {"analise_auditoria", "descricao"},
+			new String[] {"usuario", "mfa_segredo"});
 
 	private final JdbcTemplate jdbc;
 	private final TransactionTemplate transacao;
@@ -60,12 +67,19 @@ public class CifragemDeDadosLegados implements ApplicationRunner {
 	/** Cifra todos os valores em claro das colunas clínicas e devolve quantos foram cifrados. */
 	public int cifrarLegados() {
 		int total = 0;
+		Set<String> tabelasRegravadas = new LinkedHashSet<>();
 		for (String[] coluna : COLUNAS) {
 			int noLote;
 			do {
 				noLote = cifrarLote(coluna[0], coluna[1]);
 				total += noLote;
-			} while (noLote == LOTE);
+				if (noLote > 0) {
+					tabelasRegravadas.add(coluna[0]);
+				}
+			} while (noLote > 0);
+		}
+		for (String tabela : tabelasRegravadas) {
+			jdbc.execute("vacuum full " + tabela);
 		}
 		return total;
 	}
@@ -74,7 +88,7 @@ public class CifragemDeDadosLegados implements ApplicationRunner {
 		Integer cifrados = transacao.execute(status -> {
 			List<Map<String, Object>> emClaro = jdbc.queryForList("select id, " + coluna + " as valor from " + tabela
 					+ " where " + coluna + " is not null and " + coluna + " not like '" + CifraDeDadosClinicos.PREFIXO
-					+ "%' limit " + LOTE + " for update");
+					+ "%' limit " + LOTE + " for update skip locked");
 			for (Map<String, Object> linha : emClaro) {
 				jdbc.update("update " + tabela + " set " + coluna + " = ? where id = ?",
 						cifra.cifrar(linha.get("valor").toString()), (UUID) linha.get("id"));
