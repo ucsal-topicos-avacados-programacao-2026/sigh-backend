@@ -57,7 +57,8 @@ class ContextoTriagemServiceTest {
 	@BeforeEach
 	public void prepararTriagem() {
 		IAProperties configuracao = new IAProperties("http://ia.teste", "modelo-teste", null, 0,
-				Duration.ofSeconds(5), 20, new ByteArrayResource(new byte[0]), new ByteArrayResource(new byte[0]));
+				Duration.ofSeconds(5), 20, new ByteArrayResource(new byte[0]), new ByteArrayResource(new byte[0]),
+				Duration.ofSeconds(10), 5, false);
 		contextoTriagemService = new ContextoTriagemService(triagemRepository, historicoAutorizadoService, configuracao,
 				vinculoService);
 		triagem = new Triagem();

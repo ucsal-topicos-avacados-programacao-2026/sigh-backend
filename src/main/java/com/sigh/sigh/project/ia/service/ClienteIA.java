@@ -10,6 +10,7 @@ import com.sigh.sigh.project.ia.dto.RespostaChatIA;
 import com.sigh.sigh.project.triagem.entity.CorRisco;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -28,14 +29,20 @@ public class ClienteIA {
 	private static final String CAMINHO_CHAT = "/v1/chat/completions";
 	private static final String RACIOCINIO_DESLIGADO = "none";
 
+	private static final String INSTRUCOES_AQUECIMENTO = "Responda apenas: ok";
+
 	private final RestClient clienteHttpIA;
+	private final RestClient clienteHttpIAResumo;
 	private final IAProperties iaProperties;
 	private final JsonMapper leitorJson;
 	private final String instrucoesTriagem;
 	private final String instrucoesResumo;
 
-	public ClienteIA(RestClient clienteHttpIA, IAProperties iaProperties, JsonMapper leitorJson) throws IOException {
+	public ClienteIA(@Qualifier("clienteHttpIA") RestClient clienteHttpIA,
+			@Qualifier("clienteHttpIAResumo") RestClient clienteHttpIAResumo, IAProperties iaProperties,
+			JsonMapper leitorJson) throws IOException {
 		this.clienteHttpIA = clienteHttpIA;
+		this.clienteHttpIAResumo = clienteHttpIAResumo;
 		this.iaProperties = iaProperties;
 		this.leitorJson = leitorJson;
 		this.instrucoesTriagem = iaProperties.instrucoesTriagem().getContentAsString(StandardCharsets.UTF_8);
@@ -43,16 +50,22 @@ public class ClienteIA {
 	}
 
 	public CorRisco classificarRisco(String descricaoDoCaso) {
-		String conteudo = enviar(montarPedido(instrucoesTriagem, descricaoDoCaso, FormatoRespostaIA.classificacaoDeRisco()));
+		String conteudo = enviar(clienteHttpIA,
+				montarPedido(instrucoesTriagem, descricaoDoCaso, FormatoRespostaIA.classificacaoDeRisco()));
 		return lerCor(conteudo);
 	}
 
 	public String resumirHistorico(String historico) {
-		String resumo = enviar(montarPedido(instrucoesResumo, historico, null)).strip();
+		String resumo = enviar(clienteHttpIAResumo, montarPedido(instrucoesResumo, historico, null)).strip();
 		if (resumo.isEmpty()) {
 			throw respostaInvalida();
 		}
 		return resumo;
+	}
+
+	/** Pedido mínimo, só para o serviço de IA carregar o modelo antes do primeiro pedido de verdade. */
+	public void aquecer() {
+		enviar(clienteHttpIAResumo, montarPedido(INSTRUCOES_AQUECIMENTO, "ok", null));
 	}
 
 	private PedidoChatIA montarPedido(String instrucoes, String conteudo, FormatoRespostaIA formato) {
@@ -64,9 +77,9 @@ public class ClienteIA {
 				formato);
 	}
 
-	private String enviar(PedidoChatIA pedido) {
+	private String enviar(RestClient cliente, PedidoChatIA pedido) {
 		try {
-			RespostaChatIA resposta = clienteHttpIA.post()
+			RespostaChatIA resposta = cliente.post()
 					.uri(CAMINHO_CHAT)
 					.body(pedido)
 					.retrieve()

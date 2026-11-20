@@ -23,8 +23,9 @@ public class ResumoHistoricoController {
 	private final GeracaoResumoService geracaoResumoService;
 	private final ResumoHistoricoService resumoHistoricoService;
 
+	/** O resumo é gerado em segundo plano: volta 202 com o resumo em geração, e o resultado sai em GET /resumos/{id}. */
 	@PostMapping("/atendimentos/{atendimentoId}/resumos")
-	@ResponseStatus(HttpStatus.CREATED)
+	@ResponseStatus(HttpStatus.ACCEPTED)
 	public ResumoHistoricoResponseDTO gerar(@PathVariable UUID atendimentoId, Principal medico) {
 		return geracaoResumoService.gerar(atendimentoId, medico.getName());
 	}

@@ -10,6 +10,7 @@ import org.springframework.web.client.RestClient;
 
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Set;
@@ -20,11 +21,25 @@ public class IAConfig {
 
 	private static final Set<String> NA_PROPRIA_MAQUINA = Set.of("localhost", "127.0.0.1", "[::1]");
 
+	/** Cliente da sugestão de risco, pedida durante a triagem: espera até {@code sigh.ia.tempo-limite}. */
 	@Bean
 	public RestClient clienteHttpIA(IAProperties iaProperties,
 			@Value("${sigh.ia.restringir-destino:false}") boolean restringirDestino,
 			@Value("${sigh.ia.hosts-autorizados:}") String hostsAutorizados) {
 		validarDestino(iaProperties.url(), restringirDestino, hostsAutorizados);
+		return construir(iaProperties, iaProperties.tempoLimite());
+	}
+
+	/** Cliente do resumo, gerado em segundo plano: espera até {@code sigh.ia.tempo-limite-resumo}. */
+	@Bean
+	public RestClient clienteHttpIAResumo(IAProperties iaProperties,
+			@Value("${sigh.ia.restringir-destino:false}") boolean restringirDestino,
+			@Value("${sigh.ia.hosts-autorizados:}") String hostsAutorizados) {
+		validarDestino(iaProperties.url(), restringirDestino, hostsAutorizados);
+		return construir(iaProperties, iaProperties.tempoLimiteResumo());
+	}
+
+	private static RestClient construir(IAProperties iaProperties, Duration tempoLimite) {
 		// Direto ao destino validado: sem seguir redirecionamento, que levaria o dado clínico a outro destino, e
 		// sem proxy da JVM, que veria em claro o tráfego HTTP para a IA na própria máquina.
 		HttpClient conexao = HttpClient.newBuilder()
@@ -33,7 +48,7 @@ public class IAConfig {
 				.proxy(HttpClient.Builder.NO_PROXY)
 				.build();
 		JdkClientHttpRequestFactory fabricaDeRequisicoes = new JdkClientHttpRequestFactory(conexao);
-		fabricaDeRequisicoes.setReadTimeout(iaProperties.tempoLimite());
+		fabricaDeRequisicoes.setReadTimeout(tempoLimite);
 		RestClient.Builder construtor = RestClient.builder()
 				.baseUrl(iaProperties.url())
 				.requestFactory(fabricaDeRequisicoes);
