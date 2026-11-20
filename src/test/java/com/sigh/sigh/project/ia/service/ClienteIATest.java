@@ -89,6 +89,7 @@ class ClienteIATest {
 	void resumoEhPedidoEmTextoLivreComAsInstrucoesDeResumo() {
 		servidorIA.expect(requestTo(ENDERECO_IA + "/v1/chat/completions"))
 				.andExpect(jsonPath("$.messages[0].content").value("Instruções de resumo"))
+				.andExpect(jsonPath("$.messages[1].content").value("- 2026-09-20 | Hospital | ALERGIA: dipirona"))
 				.andExpect(jsonPath("$.response_format").doesNotExist())
 				.andRespond(withSuccess(respostaComConteudo("  Alergias: dipirona.  "), MediaType.APPLICATION_JSON));
 

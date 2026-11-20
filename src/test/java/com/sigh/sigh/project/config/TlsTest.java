@@ -78,6 +78,8 @@ class TlsTest {
 		propriedades.add("spring.datasource.url", () -> BancoDoSigh.urlComTls(banco, certificadoDoBanco));
 		propriedades.add("spring.datasource.username", () -> BancoDoSigh.USUARIO);
 		propriedades.add("spring.datasource.password", () -> BancoDoSigh.SENHA);
+		// Fixa a IA na própria máquina: um SIGH_IA_URL remoto no ambiente de quem roda os testes derrubaria a classe.
+		propriedades.add("sigh.ia.url", () -> "http://localhost:11434");
 	}
 
 	@Test
@@ -199,6 +201,29 @@ class TlsTest {
 			}
 		} finally {
 			jdbc.execute("drop database sigh_intocado");
+		}
+	}
+
+	/**
+	 * O serviço de IA é ponto de decifragem (RNF-004): no perfil tls, a aplicação de verdade não sobe com a IA
+	 * num host que não foi autorizado, nem com ela fora da máquina sem HTTPS.
+	 */
+	@Test
+	void aplicacaoNoPerfilTlsNaoSobeComIAForaDosDestinosAutorizados() {
+		for (String[] caso : new String[][] {
+				{"https://ia.externa.example", "", "não está em sigh.ia.hosts-autorizados"},
+				{"http://ia.rede.example", "ia.rede.example", "sigh.ia.url precisa usar HTTPS"}}) {
+			// Pela linha de comando, para valer acima do DB_URL e do SIGH_IA_* do ambiente de quem roda os testes.
+			assertThatThrownBy(() -> new SpringApplicationBuilder(SighProjectApplication.class).profiles("tls")
+					.run("--spring.datasource.url=" + BancoDoSigh.urlComTls(banco, certificadoDoBanco),
+							"--spring.datasource.username=" + BancoDoSigh.USUARIO,
+							"--spring.datasource.password=" + BancoDoSigh.SENHA, "--server.port=0",
+							"--SIGH_TLS_CERTIFICADO=file:" + certificadoDoBackEnd.certificadoPem(),
+							"--SIGH_TLS_CHAVE_PRIVADA=file:" + certificadoDoBackEnd.chavePem(),
+							"--sigh.ia.url=" + caso[0], "--sigh.ia.hosts-autorizados=" + caso[1])
+					.close())
+					.as(caso[0])
+					.hasStackTraceContaining(caso[2]);
 		}
 	}
 
