@@ -5,7 +5,9 @@
 #   (caminhos de arquivos montados no container);
 # - summarize_wal ligado (backup incremental) e, com SIGH_WAL_DIR, arquivamento de cada segmento de WAL
 #   cifrado com SIGH_CHAVE_BACKUP (arquivar-wal.sh), no máximo a cada SIGH_WAL_INTERVALO segundos
-#   (padrão 300).
+#   (padrão 300);
+# - wal_recycle desligado (BE-26): um segmento de WAL antigo é apagado, e não renomeado para uso futuro
+#   com o conteúdo antigo dentro, que podia guardar dado clínico de antes da cifragem.
 # As demais variáveis são as da imagem oficial (POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB).
 set -eu
 : "${SIGH_TLS_CERTIFICADO_BANCO:?defina SIGH_TLS_CERTIFICADO_BANCO (certificado do servidor, PEM)}"
@@ -20,7 +22,7 @@ install -o postgres -g postgres -m 600 /opt/sigh-backup/pg_hba-tls.conf /etc/sig
 set -- postgres -c ssl=on -c ssl_min_protocol_version=TLSv1.2 \
     -c ssl_cert_file=/etc/sigh-banco/servidor.crt -c ssl_key_file=/etc/sigh-banco/servidor.key \
     -c hba_file=/etc/sigh-banco/pg_hba.conf -c password_encryption=scram-sha-256 \
-    -c wal_level=replica -c summarize_wal=on "$@"
+    -c wal_level=replica -c summarize_wal=on -c wal_recycle=off "$@"
 if [ -n "${SIGH_WAL_DIR:-}" ]; then
     : "${SIGH_CHAVE_BACKUP:?defina SIGH_CHAVE_BACKUP para cifrar os segmentos de WAL}"
     mkdir -p "$SIGH_WAL_DIR"
