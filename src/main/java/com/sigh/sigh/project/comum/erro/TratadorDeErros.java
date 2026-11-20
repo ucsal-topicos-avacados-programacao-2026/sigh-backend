@@ -1,5 +1,6 @@
 package com.sigh.sigh.project.comum.erro;
 
+import com.sigh.sigh.project.comum.cripto.DadoClinicoIlegivelException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -66,6 +67,16 @@ public class TratadorDeErros {
 		log.error("Violação de integridade inesperada (SQLState={}, constraint={})",
 				ViolacaoDeUnicidade.sqlState(ex), ViolacaoDeUnicidade.restricao(ex));
 		return ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "Erro interno.");
+	}
+
+	/**
+	 * Dado clínico que não decifra (gravado fora da aplicação, copiado de outra linha ou adulterado): a
+	 * leitura é recusada (RNF-004). O log já tem a coluna e a linha; a resposta não diz nada do dado.
+	 */
+	@ExceptionHandler(DadoClinicoIlegivelException.class)
+	public ProblemDetail dadoClinicoIlegivel(DadoClinicoIlegivelException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
+				"Um dado clínico não passou na verificação de integridade e não foi exibido. O caso foi registrado.");
 	}
 
 	private static ProblemDetail dadosInvalidos(Map<String, String> campos) {
