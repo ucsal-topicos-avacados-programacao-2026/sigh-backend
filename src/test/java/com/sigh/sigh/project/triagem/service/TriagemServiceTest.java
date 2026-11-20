@@ -88,14 +88,17 @@ class TriagemServiceTest {
 		verify(triagemRepository, never()).save(any());
 	}
 
+	/** BE-24: o paciente com o médico pode ser reclassificado, sem voltar para a fila de triagem. */
 	@Test
-	void atendimentoJaComOMedicoNaoVoltaParaTriagem() {
+	void atendimentoJaComOMedicoAceitaReclassificacaoSemVoltarParaAFila() {
 		Atendimento atendimento = novoAtendimento(StatusAtendimento.EM_ATENDIMENTO);
 		when(atendimentoRepository.findById(atendimento.getId())).thenReturn(Optional.of(atendimento));
+		when(triagemRepository.save(any(Triagem.class))).thenAnswer(invocacao -> invocacao.getArgument(0));
 
-		assertThatThrownBy(() -> triagemService.registrar(
-				new TriagemRequestDTO(atendimento.getId(), "Dor torácica", SINAIS_VITAIS), LOGIN_ENFERMEIRO))
-				.isInstanceOf(RegraNegocioException.class);
+		triagemService.registrar(new TriagemRequestDTO(atendimento.getId(), "Dor torácica", SINAIS_VITAIS),
+				LOGIN_ENFERMEIRO);
+
+		verify(triagemRepository).save(any(Triagem.class));
 		assertThat(atendimento.getStatus()).isEqualTo(StatusAtendimento.EM_ATENDIMENTO);
 	}
 
@@ -124,6 +127,18 @@ class TriagemServiceTest {
 		assertThatThrownBy(() -> triagemService.confirmarRisco(triagem.getId(), CorRisco.AZUL, LOGIN_ENFERMEIRO))
 				.isInstanceOf(RegraNegocioException.class);
 		assertThat(triagem.getCorConfirmada()).isEqualTo(CorRisco.VERDE);
+	}
+
+	/** BE-24: "até o atendimento ser encerrado" vale também para a confirmação de uma triagem pendente. */
+	@Test
+	void naoConfirmaClassificacaoDeAtendimentoEncerrado() {
+		Triagem triagem = novaTriagem();
+		triagem.getAtendimento().setStatus(StatusAtendimento.ENCERRADO);
+		when(triagemRepository.findById(triagem.getId())).thenReturn(Optional.of(triagem));
+
+		assertThatThrownBy(() -> triagemService.confirmarRisco(triagem.getId(), CorRisco.VERMELHO, LOGIN_ENFERMEIRO))
+				.isInstanceOf(RegraNegocioException.class).hasMessageContaining("encerrado");
+		assertThat(triagem.getCorConfirmada()).isNull();
 	}
 
 	private Atendimento novoAtendimento(StatusAtendimento status) {

@@ -30,8 +30,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TriagemService {
 
+	/**
+	 * A triagem de chegada (aberto ou em triagem) e a reclassificação durante o atendimento (BE-24): o
+	 * paciente pode piorar ou melhorar depois de o médico começar. Só o atendimento encerrado não aceita.
+	 */
 	private static final Set<StatusAtendimento> STATUS_QUE_ACEITAM_TRIAGEM =
-			EnumSet.of(StatusAtendimento.ABERTO, StatusAtendimento.EM_TRIAGEM);
+			EnumSet.of(StatusAtendimento.ABERTO, StatusAtendimento.EM_TRIAGEM, StatusAtendimento.EM_ATENDIMENTO);
 
 	private final TriagemRepository triagemRepository;
 	private final AtendimentoRepository atendimentoRepository;
@@ -46,14 +50,17 @@ public class TriagemService {
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Atendimento não encontrado."));
 		vinculoService.exigirVinculoAtivo(loginEnfermeiro, atendimento.getInstituicao().getId(), Perfil.ENFERMEIRO);
 		if (!STATUS_QUE_ACEITAM_TRIAGEM.contains(atendimento.getStatus())) {
-			throw new RegraNegocioException("Só é possível triar atendimentos abertos ou em triagem.");
+			throw new RegraNegocioException("Não é possível classificar o risco de um atendimento encerrado.");
 		}
 		Triagem triagem = new Triagem();
 		triagem.setAtendimento(atendimento);
 		triagem.setSintomas(dados.sintomas());
 		triagem.setSinaisVitais(dados.sinaisVitais().paraEntidade());
 		triagem.setRegistrador(usuarioService.buscarPorLogin(loginEnfermeiro));
-		atendimento.setStatus(StatusAtendimento.EM_TRIAGEM);
+		// A reclassificação durante o atendimento não devolve o paciente para a fila de triagem.
+		if (atendimento.getStatus() != StatusAtendimento.EM_ATENDIMENTO) {
+			atendimento.setStatus(StatusAtendimento.EM_TRIAGEM);
+		}
 		return TriagemResponseDTO.de(triagemRepository.save(triagem));
 	}
 
@@ -83,6 +90,9 @@ public class TriagemService {
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Triagem não encontrada."));
 		if (triagem.getCorConfirmada() != null) {
 			throw new RegraNegocioException("A classificação desta triagem já foi confirmada.");
+		}
+		if (triagem.getAtendimento().getStatus() == StatusAtendimento.ENCERRADO) {
+			throw new RegraNegocioException("Não é possível classificar o risco de um atendimento encerrado.");
 		}
 		return triagem;
 	}

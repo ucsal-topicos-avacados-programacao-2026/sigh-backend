@@ -105,6 +105,7 @@ public interface RegistroAuditoriaRepository extends JpaRepository<RegistroAudit
 			from RegistroAuditoria r
 			join r.instituicao instituicao
 			where r.ocorridoEm >= :inicio and r.ocorridoEm < :fim
+			and r.finalidadeDeclarada not like 'Tentativa de acesso de emergência recusada%'
 			group by instituicao.id, instituicao.nome
 			order by count(r) desc
 			""")

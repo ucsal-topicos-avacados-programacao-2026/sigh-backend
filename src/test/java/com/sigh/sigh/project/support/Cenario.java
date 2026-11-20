@@ -64,10 +64,19 @@ public class Cenario {
 
 	/** Triagem do atendimento com a classificação de risco confirmada, por um enfermeiro da instituição. */
 	public UUID classificarRisco(UUID atendimentoId, Instituicao instituicao, CorRisco cor) {
-		String enfermeiro = profissional(instituicao, Perfil.ENFERMEIRO);
+		return classificarRisco(atendimentoId, cor, profissional(instituicao, Perfil.ENFERMEIRO));
+	}
+
+	/** O mesmo, por um enfermeiro informado (precisa ter vínculo na instituição do atendimento). */
+	public UUID classificarRisco(UUID atendimentoId, CorRisco cor, String enfermeiro) {
+		return classificarRisco(atendimentoId, cor, enfermeiro, enfermeiro);
+	}
+
+	/** Um enfermeiro registra a triagem e outro confirma a classificação. */
+	public UUID classificarRisco(UUID atendimentoId, CorRisco cor, String registrador, String confirmador) {
 		UUID triagem = triagemService.registrar(new TriagemRequestDTO(atendimentoId, "Dor torácica intensa",
-				new SinaisVitaisDTO("90/60", 130, 28, new BigDecimal("36.5"), new BigDecimal("88.0"))), enfermeiro).id();
-		triagemService.confirmarRisco(triagem, cor, enfermeiro);
+				new SinaisVitaisDTO("90/60", 130, 28, new BigDecimal("36.5"), new BigDecimal("88.0"))), registrador).id();
+		triagemService.confirmarRisco(triagem, cor, confirmador);
 		return triagem;
 	}
 
