@@ -1,11 +1,12 @@
 package com.sigh.sigh.project.ia.entity;
 
-import com.sigh.sigh.project.comum.cripto.TextoCifrado;
+import com.sigh.sigh.project.comum.cripto.Cifrado;
+import lombok.AccessLevel;
+import com.sigh.sigh.project.comum.cripto.CifragemDasEntidades;
 import com.sigh.sigh.project.prontuario.entity.Atendimento;
 import com.sigh.sigh.project.prontuario.entity.RegistroClinico;
 import com.sigh.sigh.project.usuario.entity.Usuario;
 import jakarta.persistence.*;
-import jakarta.persistence.Convert;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -15,6 +16,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Entity
+@EntityListeners(CifragemDasEntidades.class)
 @Table(name = "resumo_historico_ia")
 @Getter
 @Setter
@@ -36,12 +38,22 @@ public class ResumoHistoricoIA {
 	@Enumerated(EnumType.STRING)
 	private StatusResumo status;
 
-	@Convert(converter = TextoCifrado.class)
+	@Transient
+	@Cifrado(gravadoEm = "textoCifrado")
 	private String texto;
+	@Column(name = "texto")
+	@Getter(AccessLevel.NONE)
+	@Setter(AccessLevel.NONE)
+	private String textoCifrado;
 	private LocalDateTime geradoEm;
 	private String modeloVersao;
 
 	@ManyToMany
 	@JoinTable(name = "resumo_historico_ia_fontes", joinColumns = @JoinColumn(name = "resumo_historico_ia_id"))
 	private Set<RegistroClinico> fontes = new HashSet<>();
+
+	public void setTexto(String texto) {
+		this.texto = texto;
+		this.textoCifrado = Cifrado.PENDENTE;
+	}
 }
