@@ -112,7 +112,9 @@ public class AcessoAoCadastroService {
 				.filter(encontrada -> encontrada.getPaciente().getId().equals(paciente.getId()))
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Representação não encontrada."));
 		LocalDateTime agora = agora();
-		if (representacao.getFimEm() != null && !representacao.getFimEm().isAfter(agora)) {
+		boolean jaEncerrada = representacao.getFimEm() != null
+				&& (!representacao.getFimEm().isAfter(agora) || representacao.getFimEm().equals(representacao.getInicioEm()));
+		if (jaEncerrada) {
 			throw new RegraNegocioException("A representação já foi encerrada.");
 		}
 		representacao.setFimEm(agora.isBefore(representacao.getInicioEm()) ? representacao.getInicioEm() : agora);

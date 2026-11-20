@@ -154,6 +154,23 @@ class AcessoAoCadastroTest extends TesteIntegracao {
 	}
 
 	@Test
+	void representacaoFuturaEncerradaNaoEhEncerradaDeNovo() throws Exception {
+		String futura = registrarRepresentante(cenario.usuario(Perfil.PACIENTE).getLogin(),
+				"{\"inicioEm\":\"2026-12-01T00:00:00\"}")
+				.andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+		String id = JsonPath.read(futura, "$.id");
+
+		encerrarRepresentacao(id).andExpect(status().isOk()).andExpect(jsonPath("$.fimEm").value("2026-12-01T00:00:00"));
+		encerrarRepresentacao(id).andExpect(status().isUnprocessableContent());
+	}
+
+	private ResultActions encerrarRepresentacao(String representacaoId) throws Exception {
+		return mvc.perform(post("/api/pacientes/{id}/representantes/{r}/encerramento", pacienteId, representacaoId)
+				.with(user(administrativo).roles("ADMINISTRATIVO")).with(csrf())
+				.contentType(MediaType.APPLICATION_JSON).content("{\"instituicaoId\":\"%s\"}".formatted(hospital.getId())));
+	}
+
+	@Test
 	void representacaoPrecisaDeDocumentoEPeriodoValido() throws Exception {
 		String representante = cenario.usuario(Perfil.PACIENTE).getLogin();
 		mvc.perform(post("/api/pacientes/{id}/representantes", pacienteId).with(user(administrativo).roles("ADMINISTRATIVO"))

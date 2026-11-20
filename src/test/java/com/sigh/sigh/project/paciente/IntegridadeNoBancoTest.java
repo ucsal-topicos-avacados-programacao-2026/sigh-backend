@@ -69,8 +69,43 @@ class IntegridadeNoBancoTest extends TesteIntegracao {
 				.as("adicional negado").isInstanceOf(DataAccessException.class);
 		assertThatThrownBy(() -> consentimento(13, "AMPLO", "AUTORIZADO", hospital.getId(), null, null, null))
 				.as("amplo com instituição").isInstanceOf(DataAccessException.class);
+		assertThatThrownBy(() -> consentimento(15, "ADICIONAL", "REVOGADO", hospital.getId(), "Saúde mental", null, null))
+				.as("revogação sem a autorização revogada").isInstanceOf(DataAccessException.class);
+		assertThatThrownBy(() -> consentimento(16, "ADICIONAL", "AUTORIZADO", hospital.getId(), "   ", null, null))
+				.as("categoria em branco").isInstanceOf(DataAccessException.class);
 		assertThatCode(() -> consentimento(14, "ADICIONAL", "AUTORIZADO", hospital.getId(), null, registroId, null))
 				.doesNotThrowAnyException();
+	}
+
+	@Test
+	void restricaoSoPodeSerEncerradaUmaVezENuncaApagada() {
+		UUID restricao = restricao("Saúde mental", null, null);
+
+		assertThatThrownBy(() -> jdbc.update("update restricao_acesso set categoria_alvo = 'Ortopedia' where id = ?", restricao))
+				.as("trocar o alvo").isInstanceOf(DataAccessException.class);
+		assertThatThrownBy(() -> jdbc.update("update restricao_acesso set fim_em = ? where id = ?", AGORA, restricao))
+				.as("encerrar sem dizer quem").isInstanceOf(DataAccessException.class);
+		assertThatThrownBy(() -> jdbc.update("delete from restricao_acesso where id = ?", restricao))
+				.isInstanceOf(DataAccessException.class);
+		jdbc.update("update restricao_acesso set fim_em = ?, encerrada_por_id = ? where id = ?", AGORA, usuarioId, restricao);
+		assertThatThrownBy(() -> jdbc.update("update restricao_acesso set fim_em = ?, encerrada_por_id = ? where id = ?",
+				AGORA, usuarioId, restricao)).as("encerrar de novo").isInstanceOf(DataAccessException.class);
+		assertThatThrownBy(() -> restricao(" ", null, null)).as("categoria em branco").isInstanceOf(DataAccessException.class);
+	}
+
+	@Test
+	void representacaoSoTemOFimAntecipadoENuncaEhApagada() {
+		UUID representacao = representacao(AGORA, Timestamp.valueOf(LocalDateTime.of(2026, 12, 31, 0, 0)));
+
+		assertThatThrownBy(() -> jdbc.update("update representacao_legal set fim_em = ? where id = ?",
+				Timestamp.valueOf(LocalDateTime.of(2027, 6, 1, 0, 0)), representacao))
+				.as("adiar o fim").isInstanceOf(DataAccessException.class);
+		assertThatThrownBy(() -> jdbc.update("update representacao_legal set documento = 'Outro' where id = ?", representacao))
+				.isInstanceOf(DataAccessException.class);
+		assertThatThrownBy(() -> jdbc.update("delete from representacao_legal where id = ?", representacao))
+				.isInstanceOf(DataAccessException.class);
+		assertThatCode(() -> jdbc.update("update representacao_legal set fim_em = ? where id = ?",
+				Timestamp.valueOf(LocalDateTime.of(2026, 11, 20, 0, 0)), representacao)).doesNotThrowAnyException();
 	}
 
 	@Test
@@ -134,18 +169,22 @@ class IntegridadeNoBancoTest extends TesteIntegracao {
 		return id;
 	}
 
-	private void restricao(String categoria, UUID registro, Timestamp fim) {
+	private UUID restricao(String categoria, UUID registro, Timestamp fim) {
+		UUID id = UUID.randomUUID();
 		jdbc.update("""
 				insert into restricao_acesso (id, prontuario_id, inicio_em, fim_em, categoria_alvo, registro_alvo_id,
 				  definida_por_id)
 				values (?, ?, ?, ?, ?, ?, ?)
-				""", UUID.randomUUID(), prontuarioId, AGORA, fim, categoria, registro, usuarioId);
+				""", id, prontuarioId, AGORA, fim, categoria, registro, usuarioId);
+		return id;
 	}
 
-	private void representacao(Timestamp inicio, Timestamp fim) {
+	private UUID representacao(Timestamp inicio, Timestamp fim) {
+		UUID id = UUID.randomUUID();
 		jdbc.update("""
 				insert into representacao_legal (id, paciente_id, representante_id, inicio_em, fim_em, documento)
 				values (?, ?, ?, ?, ?, 'Termo fictício')
-				""", UUID.randomUUID(), pacienteId, usuarioId, inicio, fim);
+				""", id, pacienteId, usuarioId, inicio, fim);
+		return id;
 	}
 }
