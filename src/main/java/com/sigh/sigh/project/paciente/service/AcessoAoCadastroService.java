@@ -1,5 +1,7 @@
 package com.sigh.sigh.project.paciente.service;
 
+import com.sigh.sigh.project.auditoria.dto.AcessoProntuarioDTO;
+import com.sigh.sigh.project.auditoria.service.RegistroAuditoriaService;
 import com.sigh.sigh.project.comum.erro.RecursoNaoEncontradoException;
 import com.sigh.sigh.project.comum.erro.RegraNegocioException;
 import com.sigh.sigh.project.paciente.dto.RepresentacaoRequest;
@@ -9,9 +11,10 @@ import com.sigh.sigh.project.paciente.entity.RepresentacaoLegal;
 import com.sigh.sigh.project.paciente.repository.PacienteRepository;
 import com.sigh.sigh.project.paciente.repository.RepresentacaoLegalRepository;
 import com.sigh.sigh.project.prontuario.repository.AtendimentoRepository;
+import com.sigh.sigh.project.prontuario.repository.ProntuarioRepository;
 import com.sigh.sigh.project.usuario.entity.Perfil;
 import com.sigh.sigh.project.usuario.entity.Usuario;
-import com.sigh.sigh.project.usuario.service.UsuarioService;
+import com.sigh.sigh.project.usuario.repository.UsuarioRepository;
 import com.sigh.sigh.project.usuario.service.VinculoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
@@ -22,6 +25,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -34,11 +38,17 @@ import java.util.UUID;
 public class AcessoAoCadastroService {
 
 	static final String SEM_RELACAO = "A instituição não atendeu este paciente.";
+	static final String CONTA_INVALIDA = "A conta informada não pode ser usada para este paciente.";
+	static final String FINALIDADE_CONTA = "Vínculo da conta de acesso do paciente";
+	static final String FINALIDADE_REPRESENTACAO = "Registro de representante legal";
+	static final String FINALIDADE_ENCERRAMENTO = "Encerramento de representação legal";
 
 	private final PacienteRepository pacienteRepository;
 	private final RepresentacaoLegalRepository representacaoRepository;
 	private final AtendimentoRepository atendimentoRepository;
-	private final UsuarioService usuarioService;
+	private final UsuarioRepository usuarioRepository;
+	private final ProntuarioRepository prontuarioRepository;
+	private final RegistroAuditoriaService registroAuditoriaService;
 	private final VinculoService vinculoService;
 	private final Clock clock;
 
@@ -48,13 +58,14 @@ public class AcessoAoCadastroService {
 		if (paciente.getConta() != null) {
 			throw new RegraNegocioException("O paciente já tem conta de acesso vinculada.");
 		}
-		Usuario conta = usuarioComPerfilPaciente(loginConta);
+		Usuario conta = contaDePaciente(loginConta, loginAdministrativo);
 		if (pacienteRepository.findByContaLogin(conta.getLogin()).isPresent()) {
-			throw new RegraNegocioException("Essa conta já está vinculada a outro paciente.");
+			throw new RegraNegocioException(CONTA_INVALIDA);
 		}
 		paciente.setConta(conta);
 		// conta_id é UNIQUE no banco: dois vínculos simultâneos da mesma conta resultam em 409.
 		pacienteRepository.saveAndFlush(paciente);
+		auditar(paciente, instituicaoId, loginAdministrativo, FINALIDADE_CONTA);
 	}
 
 	@Transactional(readOnly = true)
@@ -69,9 +80,9 @@ public class AcessoAoCadastroService {
 	public RepresentacaoResponse registrarRepresentacao(UUID pacienteId, RepresentacaoRequest requisicao,
 			String loginAdministrativo) {
 		Paciente paciente = pacienteAtendidoPela(requisicao.instituicaoId(), pacienteId, loginAdministrativo);
-		Usuario representante = usuarioComPerfilPaciente(requisicao.login());
+		Usuario representante = contaDePaciente(requisicao.login(), loginAdministrativo);
 		if (paciente.getConta() != null && paciente.getConta().getId().equals(representante.getId())) {
-			throw new RegraNegocioException("O paciente não pode ser representante de si mesmo.");
+			throw new RegraNegocioException(CONTA_INVALIDA);
 		}
 		LocalDateTime agora = agora();
 		LocalDateTime inicio = requisicao.inicioEm() == null ? agora : requisicao.inicioEm().truncatedTo(ChronoUnit.MICROS);
@@ -88,7 +99,9 @@ public class AcessoAoCadastroService {
 		representacao.setDocumento(requisicao.documento().strip());
 		representacao.setInicioEm(inicio);
 		representacao.setFimEm(fim);
-		return RepresentacaoResponse.de(representacaoRepository.save(representacao), agora);
+		RepresentacaoLegal registrada = representacaoRepository.save(representacao);
+		auditar(paciente, requisicao.instituicaoId(), loginAdministrativo, FINALIDADE_REPRESENTACAO);
+		return RepresentacaoResponse.de(registrada, agora);
 	}
 
 	@Transactional
@@ -103,6 +116,7 @@ public class AcessoAoCadastroService {
 			throw new RegraNegocioException("A representação já foi encerrada.");
 		}
 		representacao.setFimEm(agora);
+		auditar(paciente, instituicaoId, loginAdministrativo, FINALIDADE_ENCERRAMENTO);
 		return RepresentacaoResponse.de(representacao, agora);
 	}
 
@@ -115,12 +129,29 @@ public class AcessoAoCadastroService {
 		return pacienteRepository.findById(pacienteId).orElseThrow(() -> new AccessDeniedException(SEM_RELACAO));
 	}
 
-	private Usuario usuarioComPerfilPaciente(String login) {
-		Usuario usuario = usuarioService.buscarPorLogin(login.strip());
+	/**
+	 * Conta com perfil Paciente que não seja a do próprio administrativo. Login inexistente, perfil
+	 * errado e conta já usada dão a mesma resposta, para não revelar quais logins existem.
+	 */
+	private Usuario contaDePaciente(String login, String loginAdministrativo) {
+		String informado = login.strip();
+		if (informado.equals(loginAdministrativo)) {
+			throw new RegraNegocioException(CONTA_INVALIDA);
+		}
+		Usuario usuario = usuarioRepository.findByLogin(informado)
+				.orElseThrow(() -> new RegraNegocioException(CONTA_INVALIDA));
 		if (!usuario.getPerfis().contains(Perfil.PACIENTE)) {
-			throw new RegraNegocioException("A conta precisa ter o perfil Paciente.");
+			throw new RegraNegocioException(CONTA_INVALIDA);
 		}
 		return usuario;
+	}
+
+	/** Dar acesso ao prontuário a alguém fica na auditoria imutável (RN-006), com quem fez e onde. */
+	private void auditar(Paciente paciente, UUID instituicaoId, String loginAdministrativo, String finalidade) {
+		UUID prontuarioId = prontuarioRepository.findByPacienteId(paciente.getId())
+				.orElseThrow(() -> new RecursoNaoEncontradoException("Prontuário não encontrado.")).getId();
+		registroAuditoriaService.registrarAcesso(new AcessoProntuarioDTO(prontuarioId, loginAdministrativo,
+				Perfil.ADMINISTRATIVO, instituicaoId, finalidade, false, null, Set.of()));
 	}
 
 	/** Hora atual na mesma precisão do PostgreSQL (microssegundos). */

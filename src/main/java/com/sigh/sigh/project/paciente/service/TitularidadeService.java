@@ -35,11 +35,15 @@ public class TitularidadeService {
 	public Paciente pacienteGerenciado(String login, UUID pacienteId) {
 		Paciente paciente = pacienteRepository.findById(pacienteId)
 				.orElseThrow(() -> new AccessDeniedException(SEM_PERMISSAO));
-		boolean titular = paciente.getConta() != null && paciente.getConta().getLogin().equals(login);
-		if (titular || representacaoRepository.existeVigente(pacienteId, login, LocalDateTime.now(clock))) {
+		if (ehTitular(paciente, login) || representacaoRepository.existeVigente(pacienteId, login, LocalDateTime.now(clock))) {
 			return paciente;
 		}
 		throw new AccessDeniedException(SEM_PERMISSAO);
+	}
+
+	/** O próprio paciente, e não um representante. */
+	public boolean ehTitular(Paciente paciente, String login) {
+		return paciente.getConta() != null && paciente.getConta().getLogin().equals(login);
 	}
 
 	@Transactional(readOnly = true)

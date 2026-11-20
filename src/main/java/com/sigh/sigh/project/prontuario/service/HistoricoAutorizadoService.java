@@ -68,7 +68,22 @@ public class HistoricoAutorizadoService {
 			String justificativa) {
 		List<RegistroClinico> historico = registroClinicoRepository.historicoCompleto(atendimento.getProntuario().getId());
 		registrarAcesso(atendimento, consulta, historico, true, justificativa);
+		// Grava agora: se a auditoria falhar, a exceção sai antes de qualquer dado ser devolvido.
+		registroClinicoRepository.flush();
 		return historico;
+	}
+
+	/**
+	 * Se todos os registros informados continuam visíveis para o atendimento. Um resumo por IA feito
+	 * antes de uma restrição ou revogação não pode continuar mostrando o que ela passou a esconder.
+	 */
+	@Transactional(readOnly = true)
+	public boolean continuamVisiveis(Atendimento atendimento, Set<UUID> registros) {
+		if (registros.isEmpty()) {
+			return true;
+		}
+		return registroClinicoRepository.visiveisEntre(registros, atendimento.getInstituicao().getId(),
+				compartilhadoCom(atendimento), LocalDateTime.now(clock)).size() == registros.size();
 	}
 
 	/** Registros do prontuário cobertos por restrição vigente do paciente. */
