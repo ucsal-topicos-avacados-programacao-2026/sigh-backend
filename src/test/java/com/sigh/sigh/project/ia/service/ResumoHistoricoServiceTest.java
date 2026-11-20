@@ -18,9 +18,11 @@ import com.sigh.sigh.project.usuario.service.VinculoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -32,6 +34,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -61,15 +65,19 @@ class ResumoHistoricoServiceTest {
 	@Mock
 	private VinculoService vinculoService;
 
+	@Mock
+	private FilaDeResumosIA filaDeResumos;
+
 	private ResumoHistoricoService resumoHistoricoService;
 
 	@BeforeEach
 	public void prepararServico() {
 		IAProperties configuracao = new IAProperties("http://ia.teste", "qwen3:8b", null, 0,
-				Duration.ofSeconds(5), 20, new ByteArrayResource(new byte[0]), new ByteArrayResource(new byte[0]));
+				Duration.ofSeconds(5), 20, new ByteArrayResource(new byte[0]), new ByteArrayResource(new byte[0]),
+				Duration.ofSeconds(10), 5, false);
 		resumoHistoricoService = new ResumoHistoricoService(resumoHistoricoIARepository, atendimentoRepository,
 				historicoAutorizadoService, registroAuditoriaService, usuarioService, configuracao,
-				RelogioDeTeste.em(AGORA), vinculoService);
+				RelogioDeTeste.em(AGORA), vinculoService, filaDeResumos);
 	}
 
 	@Test
@@ -95,6 +103,78 @@ class ResumoHistoricoServiceTest {
 		assertThat(resumo.getTexto()).isEqualTo("Alergias: dipirona.");
 		assertThat(resumo.getModeloVersao()).isEqualTo("qwen3:8b");
 		assertThat(resumo.getGeradoEm()).isEqualTo(AGORA);
+	}
+
+	@Test
+	void resumoQueJaFalhouNaoRecebeOTextoQueChegaDepois() {
+		ResumoHistoricoIA resumo = resumoComStatus(StatusResumo.FALHOU);
+
+		resumoHistoricoService.concluir(resumo.getId(), "Alergias: dipirona.");
+
+		assertThat(resumo.getStatus()).isEqualTo(StatusResumo.FALHOU);
+		assertThat(resumo.getTexto()).isNull();
+	}
+
+	/** Conferido antes de mandar o histórico à IA: na fila, o médico pode perder o vínculo ou a fonte, a visibilidade. */
+	@Test
+	void continuaAutorizadoSoComVinculoEFontesVisiveis() {
+		ResumoHistoricoIA resumo = resumoComStatus(StatusResumo.SOLICITADO);
+		Usuario solicitante = new Usuario();
+		solicitante.setLogin(LOGIN_MEDICO);
+		resumo.setSolicitante(solicitante);
+		fontesVisiveis(resumo, true);
+		assertThat(resumoHistoricoService.continuaAutorizado(resumo.getId())).isTrue();
+
+		fontesVisiveis(resumo, false);
+		assertThat(resumoHistoricoService.continuaAutorizado(resumo.getId())).as("fonte restrita na fila").isFalse();
+
+		// Sem vínculo, nem chega a conferir as fontes.
+		doThrow(new AccessDeniedException("sem vínculo")).when(vinculoService)
+				.exigirVinculoAtivo(eq(LOGIN_MEDICO), any(), any());
+		assertThat(resumoHistoricoService.continuaAutorizado(resumo.getId())).as("vínculo perdido na fila").isFalse();
+	}
+
+	@Test
+	void consultaDeResumoEmGeracaoQueSaiuDaFilaMostraFalho() {
+		ResumoHistoricoIA resumo = resumoComStatus(StatusResumo.SOLICITADO);
+		fontesVisiveis(resumo, true);
+		when(filaDeResumos.pendente(resumo.getId())).thenReturn(true);
+		assertThat(resumoHistoricoService.consultar(resumo.getId(), LOGIN_MEDICO).status()).isEqualTo(StatusResumo.SOLICITADO);
+
+		when(filaDeResumos.pendente(resumo.getId())).thenReturn(false);
+		assertThat(resumoHistoricoService.consultar(resumo.getId(), LOGIN_MEDICO).status()).isEqualTo(StatusResumo.FALHOU);
+		assertThat(resumo.getStatus()).isEqualTo(StatusResumo.FALHOU);
+		verify(registroAuditoriaService, never()).registrarAcesso(any());
+	}
+
+	/**
+	 * A tarefa grava o resultado e só depois sai da fila: a consulta pergunta à fila antes de ler o resumo. Na
+	 * ordem inversa, ela leria o resumo em geração, a tarefa gravaria e sairia da fila, e a consulta o daria como
+	 * falho, apagando o texto.
+	 */
+	@Test
+	void consultaPerguntaAFilaAntesDeLerOResumo() {
+		ResumoHistoricoIA resumo = resumoComStatus(StatusResumo.SOLICITADO);
+		fontesVisiveis(resumo, true);
+
+		resumoHistoricoService.consultar(resumo.getId(), LOGIN_MEDICO);
+
+		InOrder ordem = inOrder(filaDeResumos, resumoHistoricoIARepository);
+		ordem.verify(filaDeResumos).pendente(resumo.getId());
+		ordem.verify(resumoHistoricoIARepository).findById(resumo.getId());
+	}
+
+	/** Mesmo que a geração termine antes da resposta do pedido, o texto só sai na consulta, que é auditada. */
+	@Test
+	void respostaDoPedidoNuncaTrazOTexto() {
+		ResumoHistoricoIA resumo = resumoComStatus(StatusResumo.GERADO);
+		resumo.setTexto("Alergias: dipirona.");
+
+		ResumoHistoricoResponseDTO resposta = resumoHistoricoService.emGeracao(resumo.getId());
+
+		assertThat(resposta.status()).isEqualTo(StatusResumo.SOLICITADO);
+		assertThat(resposta.texto()).isNull();
+		verify(registroAuditoriaService, never()).registrarAcesso(any());
 	}
 
 	@Test

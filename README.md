@@ -65,6 +65,35 @@ Ela fica numa transação própria, para não ser desfeita junto com a recusa. S
 
 Não há teto de acessos por profissional: um teto poderia bloquear uma emergência de verdade. O auditor também vê os indicadores por instituição. Os controles estão provados em `EmergenciaControladaTest`.
 
+## Sugestão de risco e resumo por IA (RF-003, RF-004)
+
+O serviço de IA padrão é o Ollama, na mesma máquina, com o modelo `qwen3:8b`. Ele atende um pedido por vez. Um resumo leva cerca de 23 s e uma sugestão de risco, cerca de 10 s (medidos no TST-04, em `carga/README.md`).
+
+**Sugestão de risco (enfermeiro, na triagem):** `POST /triagens/{id}/sugestao` responde na hora, com a cor sugerida. A API espera a IA até `sigh.ia.tempo-limite` (60 s). No Ollama, a sugestão espera os pedidos que chegaram antes: no máximo um resumo, porque eles vão um por vez, mas também as outras sugestões. Uma sugestão com um resumo à frente leva cerca de 33 s. Com muitas sugestões ao mesmo tempo, as últimas podem passar de 60 s. Se a IA não responder a tempo, a API devolve 503 com o aviso, e o enfermeiro classifica sem a sugestão.
+
+**Resumo do histórico (médico), em segundo plano (BE-25):**
+1. `POST /atendimentos/{id}/resumos` volta na hora com 202, e o resumo fica `SOLICITADO`, com o aviso de que está em geração. A resposta nunca traz o texto: ele só sai na consulta, que é auditada.
+2. A API gera os resumos em segundo plano, um por vez, porque pedidos em paralelo só esperariam no Ollama e estourariam o tempo-limite. Antes de mandar o histórico à IA, ela confere de novo se o médico ainda tem vínculo e se o paciente não restringiu alguma das fontes enquanto o pedido esperava na fila (RF-009). Se algo mudou, o resumo vira `FALHOU` e nada vai à IA.
+3. O médico consulta `GET /resumos/{id}` até o status mudar:
+   - `GERADO`, com o texto;
+   - ou `FALHOU`, com o aviso para seguir pelos registros originais ou pedir de novo.
+
+   A tela pode consultar a cada poucos segundos. Enquanto não há texto, a consulta não mostra dado clínico e não entra na auditoria. Quando o texto aparece, cada consulta entra.
+
+Detalhes da fila de resumos:
+- **Tamanho:** a fila guarda até `sigh.ia.fila-maxima-resumos` pedidos (50). Com ela cheia, o pedido é recusado na hora, com 503, e o resumo fica `FALHOU`.
+- **Tempo-limite:** cada resumo espera a IA até `sigh.ia.tempo-limite-resumo` (120 s). Conta a partir do envio à IA, não o tempo na fila da API. Inclui, porém, a espera no próprio Ollama atrás de sugestões de risco.
+- **Nunca preso "em geração":** a fila sabe quais resumos estão nela. Se a tarefa terminar sem conseguir gravar o resultado (o banco fora, por exemplo), a próxima consulta mostra o resumo como `FALHOU`.
+- **Memória e instância única:** a fila fica na memória. Se a aplicação parar com resumos nela, eles viram `FALHOU` ao subir (`RecuperacaoDosResumos`), antes de o servidor aceitar pedidos. Isso supõe uma instância só da aplicação. Pare a instância anterior antes de subir a nova: senão, a nova marca como falhos os resumos que a anterior ainda gera, e o texto que a anterior conseguir depois é descartado.
+- **Front-end:** a tela do médico precisa pedir o resumo e consultar `GET /resumos/{id}` até sair de `SOLICITADO`. Antes do BE-25, o pedido devolvia o texto direto (201).
+
+**Modelo carregado:** ao subir, a API pede à IA uma resposta mínima pela fila dos resumos, para o modelo carregar antes do primeiro pedido (`sigh.ia.aquecer-ao-subir`). O Ollama descarrega o modelo depois de 5 min parado. Para mantê-lo carregado, suba-o com:
+
+```
+OLLAMA_KEEP_ALIVE=-1 ollama serve
+ollama pull qwen3:8b   # uma vez
+```
+
 ## Desempenho e carga (RNF-001, RNF-002)
 
 O relatório do teste de carga, da medição da IA, da inspeção da criptografia e do ensaio de restauração está em [`carga/README.md`](carga/README.md), com os scripts para reproduzir.
