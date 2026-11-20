@@ -1,9 +1,11 @@
 package com.sigh.sigh.project.ia.entity;
 
+import com.sigh.sigh.project.comum.cripto.TextoCifrado;
 import com.sigh.sigh.project.prontuario.entity.Atendimento;
 import com.sigh.sigh.project.prontuario.entity.RegistroClinico;
 import com.sigh.sigh.project.usuario.entity.Usuario;
 import jakarta.persistence.*;
+import jakarta.persistence.Convert;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -34,6 +36,7 @@ public class ResumoHistoricoIA {
 	@Enumerated(EnumType.STRING)
 	private StatusResumo status;
 
+	@Convert(converter = TextoCifrado.class)
 	private String texto;
 	private LocalDateTime geradoEm;
 	private String modeloVersao;
