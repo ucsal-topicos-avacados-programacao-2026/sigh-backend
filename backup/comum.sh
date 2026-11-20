@@ -1,35 +1,34 @@
 #!/bin/sh
 # Funções comuns da rotina de backup do SIGH (RNF-004, RNF-007).
 # Requer PostgreSQL 17 (pg_basebackup, pg_combinebackup, pg_verifybackup), gpg, tar, gzip e flock.
-# Conexão pelo padrão do libpq: PGHOST, PGPORT, PGUSER, PGPASSWORD (usuário com REPLICATION) e,
-# em produção, PGSSLMODE=verify-full.
+# Conexão pelo padrão do libpq: PGHOST, PGPORT, PGUSER, PGPASSWORD (usuário com REPLICATION) e
+# PGSSLMODE=verify-full, com o certificado da autoridade em PGSSLROOTCERT.
 set -eu
-set -o pipefail
-umask 077
+. "$(dirname "$0")/cripto.sh"
 
 : "${SIGH_BACKUP_DIR:?defina SIGH_BACKUP_DIR (pasta das cópias)}"
-: "${SIGH_CHAVE_BACKUP:?defina SIGH_CHAVE_BACKUP (chave das cópias, fora do repositório)}"
-# Chave aleatória e longa (ex.: openssl rand -base64 32): a cifragem não pode depender de uma senha fraca.
-[ "${#SIGH_CHAVE_BACKUP}" -ge 32 ] || { echo "SIGH_CHAVE_BACKUP precisa ter pelo menos 32 caracteres" >&2; exit 1; }
+mkdir -p "$SIGH_BACKUP_DIR"
 
-agora() { date -u +%Y%m%dT%H%M%SZ; }
+# A conexão com o banco leva o backup inteiro: só com TLS e com o certificado do servidor conferido.
+exigir_tls() {
+    [ "${PGSSLMODE:-}" = "verify-full" ] || { log "defina PGSSLMODE=verify-full: o backup só conecta ao banco com TLS"; exit 1; }
+}
 
-log() { echo "[sigh-backup $(agora)] $*" >&2; }
+# Estado da última execução agendada, lido pelo verificar-backup.sh (alerta de falha, RNF-007).
+registrar_estado() {
+    tipo="$1"
+    ao_sair() {
+        mkdir -p "$SIGH_BACKUP_DIR/estado"
+        if [ "$1" -eq 0 ]; then
+            echo "$(date -u +%s) $tipo" > "$SIGH_BACKUP_DIR/estado/ultimo-sucesso"
+        else
+            echo "$(date -u +%s) $tipo saiu com o código $1" > "$SIGH_BACKUP_DIR/estado/ultima-falha"
+        fi
+    }
+}
 
-trabalho=$(mktemp -d)
-# A pasta de trabalho guarda o backup físico em claro e o arquivo da chave: some em qualquer saída,
-# e o gpg-agent (que guarda a chave na memória) é encerrado junto.
-limpar() { gpgconf --kill gpg-agent 2>/dev/null || true; rm -rf "$trabalho"; }
-trap limpar EXIT
-trap 'limpar; trap - EXIT; exit 130' INT
-trap 'limpar; trap - EXIT; exit 143' TERM
-trap 'limpar; trap - EXIT; exit 129' HUP
-# A chave vai para o gpg por arquivo, nunca pela linha de comando (que aparece no ps).
-printf '%s' "$SIGH_CHAVE_BACKUP" > "$trabalho/.chave"
-export GNUPGHOME="$trabalho/.gnupg"
-mkdir -p "$GNUPGHOME" "$SIGH_BACKUP_DIR"
-
-# Um backup por vez: completo e incremental nunca gravam na mesma cadeia ao mesmo tempo.
+# Um backup por vez: completo e incremental nunca gravam na mesma cadeia ao mesmo tempo. Um backup
+# pulado por isso conta como falha (o alerta avisa).
 travar() {
     exec 9>"$SIGH_BACKUP_DIR/.trava"
     flock -n 9 || { log "outro backup está em andamento; nada foi feito"; exit 1; }
@@ -40,16 +39,12 @@ cadeia_atual() {
     cat "$SIGH_BACKUP_DIR/cadeia-atual"
 }
 
-# Empacota a pasta e cifra com AES-256 (OpenPGP simétrico, com verificação de integridade e chave
-# derivada com o máximo de iterações). Grava com nome temporário e renomeia só no fim.
+# Empacota a pasta e cifra. Grava com nome temporário e renomeia só no fim.
 cifrar_pasta() {
     pasta="$1"; destino="$2"
     # Um .parcial deixado por uma execução interrompida não pode travar as próximas.
     rm -f "$destino.parcial"
-    tar -C "$pasta" -cf - . | gzip -6 \
-        | gpg --batch --quiet --no-symkey-cache --pinentry-mode loopback --passphrase-file "$trabalho/.chave" \
-            --symmetric --cipher-algo AES256 --s2k-digest-algo SHA512 --s2k-count 65011712 \
-            --compress-algo none --output "$destino.parcial"
+    tar -C "$pasta" -cf - . | gzip -6 | gpg_cifrar "$destino.parcial"
     mv "$destino.parcial" "$destino"
 }
 
@@ -57,8 +52,7 @@ cifrar_pasta() {
 decifrar_para() {
     arquivo="$1"; pasta="$2"
     mkdir -p "$pasta"
-    if ! gpg --batch --quiet --no-symkey-cache --pinentry-mode loopback --passphrase-file "$trabalho/.chave" \
-            --decrypt "$arquivo" > "$trabalho/parte.tar.gz" 2>"$trabalho/gpg.log"; then
+    if ! gpg_decifrar "$arquivo" > "$trabalho/parte.tar.gz" 2>"$trabalho/gpg.log"; then
         log "não foi possível decifrar $(basename "$arquivo"): cópia alterada ou chave errada"
         exit 1
     fi
@@ -70,6 +64,7 @@ decifrar_para() {
 # relação ao manifesto informado (PostgreSQL 17, exige summarize_wal = on no servidor).
 backup_fisico() {
     pasta="$1"; manifesto_base="${2:-}"
+    exigir_tls
     if [ -n "$manifesto_base" ]; then
         pg_basebackup -D "$pasta" -Fp -X stream -c fast --manifest-checksums=SHA256 --incremental="$manifesto_base"
     else
@@ -90,4 +85,48 @@ copiar_para_fora() {
         mv "$externo/$(basename "$arquivo").parcial" "$externo/$(basename "$arquivo")"
     done
     log "cadeia $(basename "$cadeia") copiada para o destino externo"
+}
+
+# O WAL arquivado (SIGH_WAL_DIR, se o executor o enxerga) também vai para o destino externo.
+copiar_wal_para_fora() {
+    [ -n "${SIGH_BACKUP_DESTINO_EXTERNO:-}" ] && [ -n "${SIGH_WAL_DIR:-}" ] && [ -d "$SIGH_WAL_DIR" ] || return 0
+    mkdir -p "$SIGH_BACKUP_DESTINO_EXTERNO/wal"
+    for arquivo in "$SIGH_WAL_DIR"/*.gpg; do
+        [ -e "$arquivo" ] || continue
+        externo="$SIGH_BACKUP_DESTINO_EXTERNO/wal/$(basename "$arquivo")"
+        [ -e "$externo" ] && continue
+        cp "$arquivo" "$externo.parcial"
+        mv "$externo.parcial" "$externo"
+    done
+}
+
+# Apaga, na pasta de WAL $1, os segmentos anteriores a $2 (o primeiro segmento do backup completo mais
+# antigo guardado junto daquela pasta). Os arquivos .history ficam.
+limpar_wal_antes() {
+    pasta="$1"; limite="$2"
+    [ -n "$pasta" ] && [ -d "$pasta" ] || return 0
+    for arquivo in "$pasta"/*.gpg; do
+        [ -e "$arquivo" ] || continue
+        nome=$(basename "$arquivo")
+        segmento=$(printf '%s' "$nome" | cut -c1-24)
+        case "$segmento" in *[!0-9A-F]*) continue ;; esac
+        [ "${#segmento}" -eq 24 ] || continue
+        if [ "$segmento" != "$limite" ] && [ "$(printf '%s\n%s\n' "$segmento" "$limite" | sort | head -n 1)" = "$segmento" ]; then
+            rm -f "$arquivo"
+        fi
+    done
+}
+
+# Limpa o WAL de cada lugar (local e externo) pela cadeia mais antiga guardada naquele mesmo lugar.
+limpar_wal() {
+    for lugar in "$SIGH_BACKUP_DIR|${SIGH_WAL_DIR:-}" \
+            "${SIGH_BACKUP_DESTINO_EXTERNO:-}|${SIGH_BACKUP_DESTINO_EXTERNO:+$SIGH_BACKUP_DESTINO_EXTERNO/wal}"; do
+        cadeias="${lugar%%|*}"; wal="${lugar#*|}"
+        [ -n "$cadeias" ] && [ -d "$cadeias" ] && [ -n "$wal" ] || continue
+        mais_antiga=$(find "$cadeias" -mindepth 1 -maxdepth 1 -type d -name 'cadeia-*' | sort | head -n 1)
+        # Sem o início registrado (cadeia anterior a esta versão), nada é apagado.
+        if [ -n "$mais_antiga" ] && [ -s "$mais_antiga/000-completo.wal-inicio" ]; then
+            limpar_wal_antes "$wal" "$(cat "$mais_antiga/000-completo.wal-inicio")"
+        fi
+    done
 }
