@@ -4,6 +4,7 @@ import com.sigh.sigh.project.prontuario.entity.RegistroClinico;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -11,17 +12,70 @@ import java.util.UUID;
 
 public interface RegistroClinicoRepository extends JpaRepository<RegistroClinico, UUID> {
 
+	/** O registro está coberto por uma restrição vigente do paciente (RF-009): ele próprio ou a categoria dele. */
+	String RESTRICAO_VIGENTE = """
+			exists (select 1 from RestricaoAcesso ra
+				where ra.prontuario.id = r.prontuario.id
+				  and ra.inicioEm <= :agora
+				  and (ra.fimEm is null or ra.fimEm > :agora)
+				  and (ra.registroAlvo.id = r.id or lower(ra.categoriaAlvo) = lower(r.categoriaInformacao)))
+			""";
+
+	/**
+	 * O paciente deu à instituição uma autorização adicional (RF-009) que cobre o registro e ainda não
+	 * a revogou. A revogação é uma nova versão do consentimento que aponta para a autorização.
+	 */
+	String AUTORIZACAO_ADICIONAL_VIGENTE = """
+			exists (select 1 from Consentimento c
+				where c.paciente.id = r.prontuario.paciente.id
+				  and c.tipo = com.sigh.sigh.project.paciente.entity.TipoConsentimento.ADICIONAL
+				  and c.decisao = com.sigh.sigh.project.paciente.entity.DecisaoConsentimento.AUTORIZADO
+				  and c.destinataria.id = :instituicaoId
+				  and (c.registroAlvo.id = r.id or lower(c.categoriaAlvo) = lower(r.categoriaInformacao))
+				  and not exists (select 1 from Consentimento revogacao where revogacao.anterior = c))
+			""";
+
+	/**
+	 * Registros que a instituição pode ver sem acesso de emergência: os que ela mesma produziu e, se o
+	 * paciente consente com o compartilhamento, os de toda a rede. Registros restritos pelo paciente
+	 * ficam de fora, salvo autorização adicional para a instituição.
+	 */
 	@Query("""
 			select r from RegistroClinico r
 			join fetch r.origem
 			where r.prontuario.id = :prontuarioId
-			and not exists (
-				select 1 from RestricaoAcesso restricao
-				where restricao.prontuario.id = :prontuarioId
-				and restricao.inicioEm <= :agora
-				and (restricao.fimEm is null or restricao.fimEm > :agora)
-				and (restricao.registroAlvo.id = r.id or restricao.categoriaAlvo = r.categoriaInformacao))
+			  and (:compartilhado = true or r.origem.id = :instituicaoId)
+			  and (not\s""" + RESTRICAO_VIGENTE + " or " + AUTORIZACAO_ADICIONAL_VIGENTE + """
+			)
 			order by r.criadoEm desc
 			""")
-	List<RegistroClinico> buscarHistoricoSemRestricao(UUID prontuarioId, LocalDateTime agora, Limit limite);
+	List<RegistroClinico> historicoVisivel(@Param("prontuarioId") UUID prontuarioId,
+			@Param("instituicaoId") UUID instituicaoId,
+			@Param("compartilhado") boolean compartilhado,
+			@Param("agora") LocalDateTime agora,
+			Limit limite);
+
+	/** Quantos registros a instituição veria se não estivessem restritos pelo paciente. */
+	@Query("""
+			select count(r) from RegistroClinico r
+			where r.prontuario.id = :prontuarioId
+			  and (:compartilhado = true or r.origem.id = :instituicaoId)
+			  and\s""" + RESTRICAO_VIGENTE + " and not " + AUTORIZACAO_ADICIONAL_VIGENTE)
+	long contarRestritosOcultos(@Param("prontuarioId") UUID prontuarioId,
+			@Param("instituicaoId") UUID instituicaoId,
+			@Param("compartilhado") boolean compartilhado,
+			@Param("agora") LocalDateTime agora);
+
+	/** Prontuário inteiro, do mais recente para o mais antigo: acesso de emergência (RN-003) e o próprio paciente. */
+	@Query("""
+			select r from RegistroClinico r
+			join fetch r.origem
+			where r.prontuario.id = :prontuarioId
+			order by r.criadoEm desc
+			""")
+	List<RegistroClinico> historicoCompleto(@Param("prontuarioId") UUID prontuarioId);
+
+	/** Registros do prontuário cobertos por restrição vigente. */
+	@Query("select r.id from RegistroClinico r where r.prontuario.id = :prontuarioId and " + RESTRICAO_VIGENTE)
+	List<UUID> restritos(@Param("prontuarioId") UUID prontuarioId, @Param("agora") LocalDateTime agora);
 }
