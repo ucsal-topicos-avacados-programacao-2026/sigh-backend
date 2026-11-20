@@ -94,6 +94,25 @@ OLLAMA_KEEP_ALIVE=-1 ollama serve
 ollama pull qwen3:8b   # uma vez
 ```
 
+## Integração com o front-end (FE-02)
+
+O front-end (`sigh-frontend`) roda em outra origem e chama a API direto, com o token no cabeçalho `Authorization`. Não há proxy no meio, que seria um intermediário lendo o tráfego (RNF-004).
+
+**Quem está logado:** `GET /usuarios/eu` devolve o login, o nome, os perfis e os vínculos ativos agora. Cada vínculo traz a instituição e os perfis habilitados nela, e dois vínculos na mesma instituição aparecem juntos.
+
+- **Perfis de cada vínculo:** só os que o usuário tem de fato, porque operar exige o perfil e o vínculo que o habilita. Uma instituição em que nenhum perfil sobra não aparece.
+- **Uso no front:** é com isso que ele monta o menu por perfil e o seletor de instituição.
+- **Ordem:** os vínculos vêm ordenados pelo nome da instituição, com as regras do português ("Ébano" antes de "Zona"). A rota não exige vínculo, porque só mostra dados do próprio usuário, e está justificada no `VinculoEmTodaRotaTest`.
+
+**CORS:**
+- **Origens:** só as de `SIGH_CORS_ORIGENS`, separadas por vírgula. Por exemplo, `https://localhost:5173,https://localhost:4173`.
+- **O que é aceito:** só os métodos que a API tem (GET, POST e PATCH) e os cabeçalhos `Authorization` e `Content-Type`, sem cookies (`allowCredentials` desligado).
+- **Onde fica:** na cadeia do Spring Security. Assim, até o 401 de uma sessão expirada chega ao front com o cabeçalho de CORS.
+- **Sem a variável:** não há CORS, e o navegador recusa a chamada de outra origem.
+- **Curinga:** `*` não é aceito, porque a API traz dado clínico.
+
+Os dois pontos estão provados em `UsuarioLogadoTest` e `CorsTest`.
+
 ## Desempenho e carga (RNF-001, RNF-002)
 
 O relatório do teste de carga, da medição da IA, da inspeção da criptografia e do ensaio de restauração está em [`carga/README.md`](carga/README.md), com os scripts para reproduzir.
