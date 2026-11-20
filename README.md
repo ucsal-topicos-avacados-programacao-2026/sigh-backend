@@ -65,6 +65,10 @@ Ela fica numa transação própria, para não ser desfeita junto com a recusa. S
 
 Não há teto de acessos por profissional: um teto poderia bloquear uma emergência de verdade. O auditor também vê os indicadores por instituição. Os controles estão provados em `EmergenciaControladaTest`.
 
+## Desempenho e carga (RNF-001, RNF-002)
+
+O relatório do teste de carga, da medição da IA, da inspeção da criptografia e do ensaio de restauração está em [`carga/README.md`](carga/README.md), com os scripts para reproduzir.
+
 ## Segurança dos dados (RNF-004, RNF-007)
 
 ### Onde o dado clínico é decifrado
