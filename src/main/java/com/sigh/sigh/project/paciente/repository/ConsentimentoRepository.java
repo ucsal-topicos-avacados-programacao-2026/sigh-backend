@@ -32,4 +32,6 @@ public interface ConsentimentoRepository extends JpaRepository<Consentimento, UU
 	default Optional<Consentimento> decisaoAmplaVigente(UUID pacienteId) {
 		return decisoesAmplas(pacienteId, TipoConsentimento.AMPLO, Limit.of(1)).stream().findFirst();
 	}
+
+	Optional<Consentimento> findFirstByPacienteIdAndTipoOrderByVersaoDesc(UUID pacienteId, TipoConsentimento tipo);
 }

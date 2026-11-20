@@ -137,7 +137,7 @@ public class ConsentimentoService {
 		consentimento.setVigenteDesde(agora);
 		consentimento.setAnterior(anterior);
 		consentimento.setOutorgante(outorgante);
-		// A UNIQUE (paciente_id, versao) da V2 barra versões repetidas em decisões simultâneas.
+		// A UNIQUE (paciente_id, versao) da V3 barra versões repetidas em decisões simultâneas.
 		return consentimentoRepository.saveAndFlush(consentimento);
 	}
 }
