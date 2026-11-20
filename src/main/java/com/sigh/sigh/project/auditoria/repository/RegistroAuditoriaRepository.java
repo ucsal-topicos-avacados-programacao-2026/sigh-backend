@@ -30,6 +30,20 @@ public interface RegistroAuditoriaRepository extends JpaRepository<RegistroAudit
 	Page<AcessoDoPacienteDTO> buscarAcessosDoPaciente(String login, Pageable paginacao);
 
 	@Query(value = """
+			select new com.sigh.sigh.project.auditoria.dto.AcessoDoPacienteDTO(
+				r.ocorridoEm, ator.nome, r.perfil, instituicao.nome, r.finalidadeDeclarada, r.emergencia)
+			from RegistroAuditoria r
+			join r.ator ator
+			left join r.instituicao instituicao
+			where r.prontuario.paciente.id = :pacienteId
+			order by r.ocorridoEm desc
+			""", countQuery = """
+			select count(r) from RegistroAuditoria r
+			where r.prontuario.paciente.id = :pacienteId
+			""")
+	Page<AcessoDoPacienteDTO> buscarAcessosAoProntuario(UUID pacienteId, Pageable paginacao);
+
+	@Query(value = """
 			select new com.sigh.sigh.project.auditoria.dto.RegistroAuditoriaResponseDTO(
 				r.id, r.prontuario.id, ator.nome, r.perfil, instituicao.nome,
 				r.ocorridoEm, r.finalidadeDeclarada, r.emergencia, r.justificativa)

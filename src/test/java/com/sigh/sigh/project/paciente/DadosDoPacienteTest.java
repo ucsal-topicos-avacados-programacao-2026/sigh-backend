@@ -7,6 +7,7 @@ import com.sigh.sigh.project.paciente.entity.Consentimento;
 import com.sigh.sigh.project.paciente.repository.ConsentimentoRepository;
 import com.sigh.sigh.project.support.Cenario;
 import com.sigh.sigh.project.support.TesteIntegracao;
+import com.sigh.sigh.project.usuario.entity.Perfil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -154,6 +155,22 @@ class DadosDoPacienteTest extends TesteIntegracao {
 		comoPaciente(get("/auditoria/meus-acessos"), titular)
 				.andExpect(jsonPath("$.content[0].finalidade").value("Consulta do histórico pelo representante legal"))
 				.andExpect(jsonPath("$.content[0].perfil").value("PACIENTE"));
+	}
+
+	/** BE-19: o representante vigente também acompanha quem acessou o prontuário do representado. */
+	@Test
+	void representanteVeOsAcessosAoProntuarioEOutroUsuarioNao() throws Exception {
+		LocalDateTime agora = LocalDateTime.now(relogio);
+		String representante = cenario.representante(pacienteId, agora.minusDays(1), null);
+		comoPaciente(get("/api/pacientes/{id}/historico", pacienteId), representante).andExpect(status().isOk());
+
+		comoPaciente(get("/api/pacientes/{id}/acessos", pacienteId), representante)
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.content[0].finalidade").value("Consulta do histórico pelo representante legal"));
+		comoPaciente(get("/api/pacientes/{id}/acessos", pacienteId), titular)
+				.andExpect(jsonPath("$.content.length()").value(1));
+		comoPaciente(get("/api/pacientes/{id}/acessos", pacienteId), cenario.usuario(Perfil.PACIENTE).getLogin())
+				.andExpect(status().isForbidden());
 	}
 
 	@Test
