@@ -60,6 +60,8 @@ Todas as chaves vêm do ambiente e nenhuma fica no repositório.
 | `SIGH_CHAVES_DADOS_ANTERIORES` | Chaves antigas, só para leitura, no formato `id:chaveBase64,...`, para trocar a chave sem perder o que já foi gravado |
 | `SIGH_CHAVE_BACKUP` | Chave das cópias de segurança: aleatória, com pelo menos 32 caracteres (`openssl rand -base64 32`). Vai para o gpg por arquivo temporário, nunca pela linha de comando |
 
+O segredo do segundo fator também é cifrado com `SIGH_CHAVE_DADOS`. Se a chave faltar, ou for trocada sem constar em `SIGH_CHAVES_DADOS_ANTERIORES`, o login com segundo fator deixa de funcionar.
+
 Guarde `SIGH_CHAVE_DADOS` (e as anteriores) e `SIGH_CHAVE_BACKUP` num cofre, fora dos servidores de aplicação, banco e backup. Sem a chave das cópias, nenhuma cópia é restaurada. Sem a chave dos dados, a cópia restaura, mas o dado clínico fica ilegível.
 
 ### HTTPS/TLS
@@ -91,7 +93,7 @@ Comportamento da rotina:
 - **Uma execução por vez:** `flock` impede duas execuções ao mesmo tempo.
 - **Gravação segura:** cada cópia é gravada com nome temporário e renomeada no fim, e a pasta de trabalho é apagada em qualquer saída.
 - **Cópia fora do servidor:** com `SIGH_BACKUP_DESTINO_EXTERNO` (uma pasta montada de outro local, como outra instituição, NFS ou armazenamento de objetos montado), cada cadeia também é copiada para lá. Assim o prontuário é recuperado mesmo se o local principal falhar (RNF-007), e o `restaurar.sh` funciona a partir dessa cópia.
-- **Agendamento:** a imagem `docker/backup/Dockerfile`, sem argumentos, sobe o agendador. Ele roda o completo aos domingos e o incremental de segunda a sábado, no horário de `SIGH_BACKUP_HORARIO` (padrão `0 2`, ou seja, 2h).
+- **Agendamento:** a imagem `docker/backup/Dockerfile`, sem argumentos, sobe o agendador. Ele roda o completo aos domingos e o incremental de segunda a sábado, no horário de `SIGH_BACKUP_HORARIO` (padrão `0 2`, ou seja, 2h). O horário é em UTC, porque a imagem não tem fuso configurado: 2h UTC são 23h em Salvador. Os valores das variáveis não podem ter quebra de linha; por isso, gere chaves com `openssl rand -base64 32`, que cabe numa linha só.
 
 **O que o servidor PostgreSQL precisa:**
 - `summarize_wal = on` (exigido pelo backup incremental);
@@ -120,6 +122,7 @@ Comportamento da rotina:
 - **C4:** a criptografia de ponta a ponta entre instituições, inclusive o papel do serviço de IA, depende do C4 (veja acima).
 - **Valor cifrado sem vínculo à linha:** ele não carrega nada que o prenda à linha e à coluna onde está (dado autenticado adicional do GCM). Quem tem acesso de escrita ao banco poderia copiar o valor cifrado de um registro para outro. Corrigir isso exige que a cifra conheça o id da linha.
 - **Leitura de valor legado:** um valor sem o prefixo é lido como legado em claro. Quem tem acesso de escrita ao banco poderia gravar texto claro, e ele seria lido como válido e cifrado na próxima inicialização.
+- **VACUUM FULL:** se a aplicação cair entre a cifragem dos dados antigos e o `VACUUM FULL`, a próxima inicialização não refaz o `VACUUM FULL`. Rode-o à mão nas tabelas da lista. Ele também precisa que o usuário do banco seja dono da tabela.
 - **WAL antigo:** os segmentos de WAL de antes da cifragem podem ter o dado em claro até serem reciclados. A cópia do servidor também não arquiva WAL, então a perda máxima é de um dia.
 - **Chaves:** não há cofre de chaves (KMS) integrado. Chaves antigas continuam lendo, mas não há tarefa que regrave os valores com a chave nova.
 - **Banco legado:** a justificativa das auditorias antigas continua como estava, porque a tabela é imutável.
