@@ -10,6 +10,7 @@ import com.sigh.sigh.project.prontuario.entity.Atendimento;
 import com.sigh.sigh.project.prontuario.entity.Prontuario;
 import com.sigh.sigh.project.prontuario.entity.RegistroClinico;
 import com.sigh.sigh.project.prontuario.repository.RegistroClinicoRepository;
+import com.sigh.sigh.project.support.RelogioDeTeste;
 import com.sigh.sigh.project.usuario.entity.Perfil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Limit;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -52,7 +54,7 @@ class HistoricoAutorizadoServiceTest {
 	@BeforeEach
 	public void prepararAtendimento() {
 		historicoAutorizadoService = new HistoricoAutorizadoService(consentimentoService, registroClinicoRepository,
-				registroAuditoriaService);
+				registroAuditoriaService, RelogioDeTeste.em(LocalDateTime.of(2026, 11, 19, 10, 30)));
 		Paciente paciente = new Paciente();
 		paciente.setId(UUID.randomUUID());
 		pacienteId = paciente.getId();

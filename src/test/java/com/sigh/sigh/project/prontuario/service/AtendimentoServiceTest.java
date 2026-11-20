@@ -10,6 +10,7 @@ import com.sigh.sigh.project.prontuario.entity.StatusAtendimento;
 import com.sigh.sigh.project.prontuario.entity.TipoRegistro;
 import com.sigh.sigh.project.prontuario.repository.AtendimentoRepository;
 import com.sigh.sigh.project.prontuario.repository.RegistroClinicoRepository;
+import com.sigh.sigh.project.support.RelogioDeTeste;
 import com.sigh.sigh.project.usuario.entity.Usuario;
 import com.sigh.sigh.project.usuario.service.UsuarioService;
 import org.junit.jupiter.api.Test;
@@ -17,8 +18,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -31,6 +35,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AtendimentoServiceTest {
+
+	private static final LocalDateTime AGORA = LocalDateTime.of(2026, 11, 19, 10, 30);
 
 	private static final UUID ATENDIMENTO_ID = UUID.randomUUID();
 	private static final String LOGIN_MEDICO = "medico.teste";
@@ -45,6 +51,9 @@ class AtendimentoServiceTest {
 
 	@Mock
 	private UsuarioService usuarioService;
+
+	@Spy
+	private Clock clock = RelogioDeTeste.em(AGORA);
 
 	@InjectMocks
 	private AtendimentoService atendimentoService;
@@ -79,7 +88,7 @@ class AtendimentoServiceTest {
 
 		assertThat(atendimento.getStatus()).isEqualTo(StatusAtendimento.EM_ATENDIMENTO);
 		assertThat(atendimento.getMedicoResponsavel()).isSameAs(medico);
-		assertThat(atendimento.getInicioClinicoEm()).isNotNull();
+		assertThat(atendimento.getInicioClinicoEm()).isEqualTo(AGORA);
 	}
 
 	@Test

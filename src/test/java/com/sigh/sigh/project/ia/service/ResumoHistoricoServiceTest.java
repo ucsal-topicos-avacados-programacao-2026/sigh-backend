@@ -9,6 +9,7 @@ import com.sigh.sigh.project.ia.repository.ResumoHistoricoIARepository;
 import com.sigh.sigh.project.prontuario.entity.Atendimento;
 import com.sigh.sigh.project.prontuario.repository.AtendimentoRepository;
 import com.sigh.sigh.project.prontuario.service.HistoricoAutorizadoService;
+import com.sigh.sigh.project.support.RelogioDeTeste;
 import com.sigh.sigh.project.usuario.entity.Usuario;
 import com.sigh.sigh.project.usuario.service.UsuarioService;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -32,6 +34,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ResumoHistoricoServiceTest {
+
+	private static final LocalDateTime AGORA = LocalDateTime.of(2026, 11, 19, 10, 30);
 
 	private static final String LOGIN_MEDICO = "medico.teste";
 
@@ -57,7 +61,8 @@ class ResumoHistoricoServiceTest {
 		IAProperties configuracao = new IAProperties("http://ia.teste", "qwen3:8b", null, 0,
 				Duration.ofSeconds(5), 20, new ByteArrayResource(new byte[0]), new ByteArrayResource(new byte[0]));
 		resumoHistoricoService = new ResumoHistoricoService(resumoHistoricoIARepository, atendimentoRepository,
-				historicoAutorizadoService, registroAuditoriaService, usuarioService, configuracao);
+				historicoAutorizadoService, registroAuditoriaService, usuarioService, configuracao,
+				RelogioDeTeste.em(AGORA));
 	}
 
 	@Test
@@ -81,7 +86,7 @@ class ResumoHistoricoServiceTest {
 		assertThat(resumo.getStatus()).isEqualTo(StatusResumo.GERADO);
 		assertThat(resumo.getTexto()).isEqualTo("Alergias: dipirona.");
 		assertThat(resumo.getModeloVersao()).isEqualTo("qwen3:8b");
-		assertThat(resumo.getGeradoEm()).isNotNull();
+		assertThat(resumo.getGeradoEm()).isEqualTo(AGORA);
 	}
 
 	@Test

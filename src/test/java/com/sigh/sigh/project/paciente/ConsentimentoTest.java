@@ -14,6 +14,7 @@ import com.sigh.sigh.project.prontuario.repository.AtendimentoRepository;
 import com.sigh.sigh.project.prontuario.repository.ProntuarioRepository;
 import com.sigh.sigh.project.prontuario.repository.RegistroClinicoRepository;
 import com.sigh.sigh.project.prontuario.service.HistoricoAutorizadoService;
+import com.sigh.sigh.project.support.RelogioDeTeste;
 import com.sigh.sigh.project.usuario.entity.Perfil;
 import com.sigh.sigh.project.support.Cenario;
 import com.sigh.sigh.project.support.TesteIntegracao;
@@ -26,7 +27,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -164,7 +164,7 @@ class ConsentimentoTest extends TesteIntegracao {
 			assertThat(historico.get(0).getOutorgante()).isNull();
 			assertThat(historico.get(2).getOutorgante().getLogin()).isEqualTo(paciente);
 			assertThat(historico.get(2).getVigenteDesde())
-					.isEqualTo(LocalDateTime.ofInstant(INICIO.plus(Duration.ofHours(2)), ZoneOffset.UTC));
+					.isEqualTo(LocalDateTime.ofInstant(INICIO.plus(Duration.ofHours(2)), RelogioDeTeste.FUSO));
 		});
 	}
 

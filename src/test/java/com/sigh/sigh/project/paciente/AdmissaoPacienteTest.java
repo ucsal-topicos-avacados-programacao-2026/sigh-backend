@@ -13,6 +13,7 @@ import com.sigh.sigh.project.prontuario.entity.StatusAtendimento;
 import com.sigh.sigh.project.prontuario.repository.AtendimentoRepository;
 import com.sigh.sigh.project.prontuario.repository.ProntuarioRepository;
 import com.sigh.sigh.project.support.Cenario;
+import com.sigh.sigh.project.support.RelogioDeTeste;
 import com.sigh.sigh.project.support.TesteIntegracao;
 import com.sigh.sigh.project.usuario.entity.Perfil;
 import org.junit.jupiter.api.Test;
@@ -26,7 +27,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -88,14 +88,14 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 		assertThat(inicial.getVersao()).isEqualTo(1);
 		assertThat(inicial.getTipo()).isEqualTo(TipoConsentimento.AMPLO);
 		assertThat(inicial.getDecisao()).isEqualTo(DecisaoConsentimento.AUTORIZADO);
-		assertThat(inicial.getVigenteDesde()).isEqualTo(LocalDateTime.ofInstant(INICIO, ZoneOffset.UTC));
+		assertThat(inicial.getVigenteDesde()).isEqualTo(LocalDateTime.ofInstant(INICIO, RelogioDeTeste.FUSO));
 
 		transacao.executeWithoutResult(s -> {
 			Atendimento atendimento = atendimentoRepository.findById(atendimentoId).orElseThrow();
 			assertThat(atendimento.getProntuario().getId()).isEqualTo(prontuarioId);
 			assertThat(atendimento.getInstituicao().getId()).isEqualTo(hospital.getId());
 			assertThat(atendimento.getStatus()).isEqualTo(StatusAtendimento.ABERTO);
-			assertThat(atendimento.getChegadaEm()).isEqualTo(LocalDateTime.ofInstant(INICIO, ZoneOffset.UTC));
+			assertThat(atendimento.getChegadaEm()).isEqualTo(LocalDateTime.ofInstant(INICIO, RelogioDeTeste.FUSO));
 			assertThat(atendimento.getMotivo()).isEqualTo("Dor no peito");
 		});
 	}
@@ -224,6 +224,26 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 				.andExpect(jsonPath("$.campos.motivo").exists());
 	}
 
+	/**
+	 * BE-12: "no futuro" é decidido pelo relógio da aplicação. Às 22h de 10/11 na Bahia já é 11/11 em
+	 * UTC (fuso da JVM dos testes), mas nascer em 11/11 ainda é no futuro.
+	 */
+	@Test
+	void dataDeNascimentoNoFuturoUsaOFusoDaAplicacao() throws Exception {
+		Instituicao hospital = cenario.instituicao(true);
+		String admin = cenario.administrativo(hospital);
+		relogio.definir(LocalDateTime.of(2026, 11, 10, 22, 0).atZone(RelogioDeTeste.FUSO).toInstant());
+		String corpo = """
+				{"cpf":"%s","nome":"Maria Fictícia","dataNascimento":"%s","instituicaoId":"%s","motivo":"Febre"}
+				""";
+
+		mvc.perform(admissao(admin, corpo.formatted(Cenario.novoCpf(), "2026-11-11", hospital.getId())))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.campos.dataNascimento").exists());
+		mvc.perform(admissao(admin, corpo.formatted(Cenario.novoCpf(), "2026-11-10", hospital.getId())))
+				.andExpect(status().isCreated());
+	}
+
 	@Test
 	void manifestacaoForaDasOpcoesOuJsonMalformadoRetorna400() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
@@ -253,7 +273,7 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 	@Test
 	void vinculoEncerradoOuAindaNaoIniciadoRecebe403() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
-		LocalDateTime agora = LocalDateTime.ofInstant(INICIO, ZoneOffset.UTC);
+		LocalDateTime agora = LocalDateTime.ofInstant(INICIO, RelogioDeTeste.FUSO);
 		String encerrado = cenario.vinculo(hospital, Perfil.ADMINISTRATIVO, agora.minusDays(10), agora.minusDays(1));
 		String futuro = cenario.vinculo(hospital, Perfil.ADMINISTRATIVO, agora.plusDays(1), null);
 		String outroPerfilNoVinculo = cenario.vinculo(hospital, Perfil.MEDICO, agora.minusDays(10), null);

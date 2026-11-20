@@ -13,6 +13,7 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
@@ -26,6 +27,7 @@ public class HistoricoAutorizadoService {
 	private final ConsentimentoService consentimentoService;
 	private final RegistroClinicoRepository registroClinicoRepository;
 	private final RegistroAuditoriaService registroAuditoriaService;
+	private final Clock clock;
 
 	@Transactional
 	public List<RegistroClinico> consultar(Atendimento atendimento, ConsultaHistoricoDTO consulta) {
@@ -37,7 +39,7 @@ public class HistoricoAutorizadoService {
 			return List.of();
 		}
 		List<RegistroClinico> historico = registroClinicoRepository.buscarHistoricoSemRestricao(
-				prontuario.getId(), LocalDateTime.now(), Limit.of(consulta.limiteDeRegistros()));
+				prontuario.getId(), LocalDateTime.now(clock), Limit.of(consulta.limiteDeRegistros()));
 		if (!historico.isEmpty()) {
 			registrarAcesso(atendimento, consulta, historico);
 		}

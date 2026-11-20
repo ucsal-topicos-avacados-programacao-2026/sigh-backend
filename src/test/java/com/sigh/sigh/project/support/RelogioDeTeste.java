@@ -3,17 +3,27 @@ package com.sigh.sigh.project.support;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicReference;
 
-/** Relógio controlado pelos testes, para que datas e horários sejam determinísticos. */
+/**
+ * Relógio controlado pelos testes, para que datas e horários sejam determinísticos. Usa o mesmo
+ * fuso padrão da aplicação, diferente do fuso da JVM dos testes (UTC, definido no pom).
+ */
 public class RelogioDeTeste extends Clock {
+
+	public static final ZoneId FUSO = ZoneId.of("America/Bahia");
 
 	private final AtomicReference<Instant> agora;
 
 	public RelogioDeTeste(Instant inicio) {
 		this.agora = new AtomicReference<>(inicio);
+	}
+
+	/** Relógio parado na data e hora local informada, no fuso {@link #FUSO}. */
+	public static RelogioDeTeste em(LocalDateTime horaLocal) {
+		return new RelogioDeTeste(horaLocal.atZone(FUSO).toInstant());
 	}
 
 	public void definir(Instant instante) {
@@ -26,7 +36,7 @@ public class RelogioDeTeste extends Clock {
 
 	@Override
 	public ZoneId getZone() {
-		return ZoneOffset.UTC;
+		return FUSO;
 	}
 
 	@Override

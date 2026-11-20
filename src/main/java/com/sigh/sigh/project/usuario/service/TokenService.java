@@ -10,6 +10,7 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -24,6 +25,7 @@ public class TokenService {
 
 	private final JwtEncoder codificadorDeToken;
 	private final JwtProperties jwtProperties;
+	private final Clock clock;
 
 	public String gerarTokenDeAcesso(Usuario usuario) {
 		List<String> perfis = usuario.getPerfis().stream()
@@ -37,7 +39,7 @@ public class TokenService {
 	}
 
 	private String gerar(String login, List<String> autorizacoes, Duration validade) {
-		Instant agora = Instant.now();
+		Instant agora = clock.instant();
 		JwtClaimsSet dados = JwtClaimsSet.builder()
 				.subject(login)
 				.issuedAt(agora)
