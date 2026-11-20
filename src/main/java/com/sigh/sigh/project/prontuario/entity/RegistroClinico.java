@@ -1,8 +1,10 @@
 package com.sigh.sigh.project.prontuario.entity;
 
+import com.sigh.sigh.project.comum.cripto.TextoCifrado;
 import com.sigh.sigh.project.instituicao.entity.Instituicao;
 import com.sigh.sigh.project.usuario.entity.Usuario;
 import jakarta.persistence.*;
+import jakarta.persistence.Convert;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -29,10 +31,12 @@ public class RegistroClinico {
 	private TipoRegistro tipo;
 
 	private LocalDateTime criadoEm;
+	@Convert(converter = TextoCifrado.class)
 	private String conteudo;
 	private String categoriaInformacao;
 
 	@Column(name = "codigo_cid10")
+	@Convert(converter = TextoCifrado.class)
 	private String codigoCID10;
 
 	@ManyToOne(fetch = FetchType.LAZY)
