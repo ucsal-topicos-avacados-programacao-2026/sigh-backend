@@ -102,7 +102,7 @@ class RegistroAuditoriaRepositoryTest {
 
 		assertThat(registros).singleElement().satisfies(registro -> {
 			assertThat(registro.instituicao()).isEqualTo("Hospital Privado Fictício");
-			assertThat(registro.justificativa()).isNotBlank();
+			assertThat(registro.justificativa()).isEqualTo("Paciente inconsciente, risco iminente");
 		});
 	}
 
