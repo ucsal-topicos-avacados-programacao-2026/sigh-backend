@@ -7,9 +7,21 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 public interface VinculoInstitucionalRepository extends JpaRepository<VinculoInstitucional, UUID> {
+
+	/** Vínculos ativos agora, com a instituição e os perfis carregados. */
+	@Query("""
+			select distinct v from VinculoInstitucional v
+			join fetch v.instituicao
+			left join fetch v.perfisHabilitados
+			where v.usuario.login = :login
+			  and v.inicioEm <= :agora
+			  and (v.fimEm is null or v.fimEm > :agora)
+			""")
+	List<VinculoInstitucional> buscarAtivos(@Param("login") String login, @Param("agora") LocalDateTime agora);
 
 	/** Verifica se o usuário tem vínculo ativo com a instituição e o perfil habilitado nela. */
 	@Query("""

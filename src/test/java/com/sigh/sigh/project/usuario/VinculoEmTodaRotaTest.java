@@ -75,7 +75,9 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 	/** Rotas de perfil de instituição que, de propósito, não exigem vínculo, e por quê. */
 	private static final Map<String, String> SEM_VINCULO = Map.of(
 			"GET /leitos", "busca de leitos aberta à rede, para ver vagas em transferências; não traz dado de"
-					+ " paciente (BE-13)");
+					+ " paciente (BE-13)",
+			"GET /usuarios/eu", "dados do próprio usuário logado, inclusive os vínculos dele: é com isso que o"
+					+ " front-end sabe em que instituição ele pode operar; não traz dado de paciente (FE-02)");
 
 	/** Rotas sem @PreAuthorize: só as de autenticação, protegidas pela configuração de segurança. */
 	private static final Set<String> SEM_PREAUTHORIZE = Set.of("POST /auth/login", "POST /auth/segundo-fator/cadastro",
