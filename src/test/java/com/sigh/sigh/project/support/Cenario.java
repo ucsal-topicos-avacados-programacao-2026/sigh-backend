@@ -11,6 +11,10 @@ import com.sigh.sigh.project.prontuario.entity.RegistroClinico;
 import com.sigh.sigh.project.prontuario.entity.TipoRegistro;
 import com.sigh.sigh.project.prontuario.repository.ProntuarioRepository;
 import com.sigh.sigh.project.prontuario.repository.RegistroClinicoRepository;
+import com.sigh.sigh.project.triagem.dto.SinaisVitaisDTO;
+import com.sigh.sigh.project.triagem.dto.TriagemRequestDTO;
+import com.sigh.sigh.project.triagem.entity.CorRisco;
+import com.sigh.sigh.project.triagem.service.TriagemService;
 import com.sigh.sigh.project.usuario.entity.Perfil;
 import com.sigh.sigh.project.usuario.entity.Usuario;
 import com.sigh.sigh.project.usuario.entity.VinculoInstitucional;
@@ -19,6 +23,7 @@ import com.sigh.sigh.project.usuario.repository.VinculoInstitucionalRepository;
 import org.springframework.boot.test.context.TestComponent;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -39,12 +44,13 @@ public class Cenario {
 	private final ProntuarioRepository prontuarioRepository;
 	private final RegistroClinicoRepository registroClinicoRepository;
 	private final RepresentacaoLegalRepository representacaoRepository;
+	private final TriagemService triagemService;
 	private final Clock clock;
 
 	public Cenario(InstituicaoRepository instituicaoRepository, UsuarioRepository usuarioRepository,
 			VinculoInstitucionalRepository vinculoRepository, PacienteRepository pacienteRepository,
 			ProntuarioRepository prontuarioRepository, RegistroClinicoRepository registroClinicoRepository,
-			RepresentacaoLegalRepository representacaoRepository, Clock clock) {
+			RepresentacaoLegalRepository representacaoRepository, TriagemService triagemService, Clock clock) {
 		this.instituicaoRepository = instituicaoRepository;
 		this.usuarioRepository = usuarioRepository;
 		this.vinculoRepository = vinculoRepository;
@@ -52,7 +58,17 @@ public class Cenario {
 		this.prontuarioRepository = prontuarioRepository;
 		this.registroClinicoRepository = registroClinicoRepository;
 		this.representacaoRepository = representacaoRepository;
+		this.triagemService = triagemService;
 		this.clock = clock;
+	}
+
+	/** Triagem do atendimento com a classificação de risco confirmada, por um enfermeiro da instituição. */
+	public UUID classificarRisco(UUID atendimentoId, Instituicao instituicao, CorRisco cor) {
+		String enfermeiro = profissional(instituicao, Perfil.ENFERMEIRO);
+		UUID triagem = triagemService.registrar(new TriagemRequestDTO(atendimentoId, "Dor torácica intensa",
+				new SinaisVitaisDTO("90/60", 130, 28, new BigDecimal("36.5"), new BigDecimal("88.0"))), enfermeiro).id();
+		triagemService.confirmarRisco(triagem, cor, enfermeiro);
+		return triagem;
 	}
 
 	/** Profissional com vínculo ativo na instituição (BE-13); retorna o login. */
