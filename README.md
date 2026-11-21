@@ -113,7 +113,7 @@ O front-end (`sigh-frontend`) roda em outra origem e chama a API direto, com o t
 
 Os dois pontos estão provados em `UsuarioLogadoTest` e `CorsTest`.
 
-**Instituições da rede (FE-05):** `GET /api/instituicoes` devolve as instituições credenciadas, só com `id` e `nome`, na ordem do português. É a lista em que o paciente escolhe a quem liberar uma informação restrita (autorização adicional, RF-009), já que a API só aceita instituição credenciada. O administrativo usa a mesma lista para escolher o destino de uma transferência (FE-04). Só os perfis Paciente e Administrativo usam a rota, que não exige vínculo e não traz dado de paciente nem de profissional. Provado em `InstituicoesDaRedeTest`.
+**Instituições da rede (FE-05):** `GET /api/instituicoes` devolve as instituições credenciadas, só com `id` e `nome`, na ordem do português. É a lista em que o paciente escolhe a quem liberar uma informação restrita (autorização adicional, RF-009), já que a API só aceita instituição credenciada. O administrativo usa a mesma lista para escolher o destino de uma transferência (FE-04). Os perfis Paciente, Administrativo e Auditor/Gestor usam a rota (o gestor escolhe nela o hospital do painel, FE-09), que não exige vínculo e não traz dado de paciente nem de profissional. Provado em `InstituicoesDaRedeTest`.
 
 **Leitos e internações (FE-04):** duas rotas de leitura para a tela do administrativo, que exigem vínculo administrativo ativo com a instituição:
 - `GET /internacoes?instituicaoId=`: internações em andamento nos leitos da instituição, pela ordem do código do leito. Cada uma traz o paciente, o leito, o atendimento de origem, o pedido de transferência pendente (se houver) e os resumos de alta feitos desde a admissão, só com id, data e autor, sem o texto clínico. É o que a tela usa para transferir e dar alta.
@@ -124,6 +124,17 @@ Provado em `InternacoesDaInstituicaoTest` e, para o vínculo, no `VinculoEmTodaR
 **Quem aguarda triagem (FE-06):** `GET /triagens/aguardando?instituicaoId=`, só para o enfermeiro com vínculo na instituição. Lista os atendimentos em aberto ou em triagem sem classificação de risco confirmada, por ordem de chegada, com a triagem começada e não confirmada, se houver (id, sintomas e a sugestão da IA). Quem já tem a classificação confirmada está em `GET /triagens/fila`. Provado em `AguardandoTriagemTest`.
 
 **Atendimentos em andamento (FE-07):** `GET /atendimentos/em-andamento?instituicaoId=`, para médico e enfermeiro com vínculo na instituição. O atendimento sai da fila de triagem quando o médico faz o primeiro registro; esta lista é por onde o médico volta ao paciente. Traz paciente, motivo, chegada, início do atendimento, a classificação de risco confirmada mais recente, o médico responsável e se ele é quem consulta, do que começou antes para o mais recente. Provado em `AtendimentosEmAndamentoTest`.
+
+**Painel por hospital (BE-27, FE-09):** `GET /painel?instituicaoId=` devolve só números da instituição agora, sem nome, CPF, motivo ou dado clínico de paciente:
+- **Leitos:** quantos por categoria e situação (só as combinações que existem).
+- **Aguardando triagem:** quantos e a maior espera, com a regra de `GET /triagens/aguardando`.
+- **Fila do médico por cor:** as cinco cores, com quantos, a maior espera desde a chegada, o tempo máximo da cor (`sigh.triagem.tempo-maximo-espera.*`) e quantos passaram dele, com a regra de `GET /triagens/fila`. O reclassificado conta só na cor mais recente.
+- **Movimento:** em atendimento, internados num leito da instituição e chegadas desde a meia-noite (no fuso da aplicação).
+- **Transferências:** pedidos pendentes recebidos e enviados.
+
+Médico, enfermeiro e administrativo precisam de vínculo ativo com a instituição; sem ele, a resposta é 403 antes de procurar a instituição, para não revelar se ela existe. O Auditor/Gestor vê qualquer instituição da rede, como nos indicadores de auditoria (RF-011), e recebe 404 para uma que não existe. Provado em `PainelDaInstituicaoTest` e no `VinculoEmTodaRotaTest`.
+
+**Dados de demonstração:** o perfil `demonstracao` cria três hospitais (Público, Privado e Universitário) com leitos, fila por cor, internações e um pedido de transferência pendente, para o painel mostrar números diferentes em cada um. O médico tem vínculo nos três, o enfermeiro e o administrativo no Público e no Universitário. Os pacientes são fictícios.
 
 ## Desempenho e carga (RNF-001, RNF-002)
 
