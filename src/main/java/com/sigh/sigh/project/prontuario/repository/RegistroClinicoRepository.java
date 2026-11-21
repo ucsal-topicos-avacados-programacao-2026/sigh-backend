@@ -101,4 +101,15 @@ public interface RegistroClinicoRepository extends JpaRepository<RegistroClinico
 	/** Registros do prontuário cobertos por restrição vigente. */
 	@Query("select r.id from RegistroClinico r where r.prontuario.id = :prontuarioId and " + RESTRICAO_VIGENTE)
 	List<UUID> restritos(@Param("prontuarioId") UUID prontuarioId, @Param("agora") LocalDateTime agora);
+
+	/** Resumos de alta do prontuário feitos desde a admissão, para o administrativo anexar à alta (FE-04). */
+	@Query("""
+			select r from RegistroClinico r
+			join fetch r.autor
+			where r.prontuario.id = :prontuarioId
+			  and r.tipo = com.sigh.sigh.project.prontuario.entity.TipoRegistro.RESUMO_ALTA
+			  and r.criadoEm >= :desde
+			order by r.criadoEm desc, r.id
+			""")
+	List<RegistroClinico> resumosDeAltaDesde(@Param("prontuarioId") UUID prontuarioId, @Param("desde") LocalDateTime desde);
 }
