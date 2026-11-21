@@ -56,7 +56,11 @@ class PerfilAntesDaValidacaoTest extends TesteIntegracao {
 			if (!metodo.getBeanType().getPackageName().startsWith("com.sigh")) {
 				continue;
 			}
+			// A mesma busca do interceptor: a regra do método e, sem ela, a da classe.
 			PreAuthorize regra = AnnotatedElementUtils.findMergedAnnotation(metodo.getMethod(), PreAuthorize.class);
+			if (regra == null) {
+				regra = AnnotatedElementUtils.findMergedAnnotation(metodo.getBeanType(), PreAuthorize.class);
+			}
 			if (regra == null) {
 				continue;
 			}
@@ -73,7 +77,11 @@ class PerfilAntesDaValidacaoTest extends TesteIntegracao {
 
 	@Test
 	void haRotasParaConferir() {
-		assertThat(casos()).as("rotas com @PreAuthorize e algum perfil de fora").hasSizeGreaterThan(30);
+		List<Caso> casos = casos();
+		assertThat(casos).as("rotas com @PreAuthorize e algum perfil de fora").hasSizeGreaterThan(150);
+		// Inclui rotas com a regra só na classe (ex.: DadosDoPacienteController, InternacaoController).
+		assertThat(casos).extracting(Caso::caminho).anyMatch(c -> c.startsWith("/internacoes"))
+				.anyMatch(c -> c.matches("/api/pacientes/[^/]+/restricoes"));
 	}
 
 	@TestFactory
