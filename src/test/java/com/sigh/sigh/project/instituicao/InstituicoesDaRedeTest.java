@@ -22,8 +22,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * FE-05 e FE-04: o paciente escolhe a quem liberar uma informação restrita (RF-009), e o administrativo escolhe o
- * destino de uma transferência (RF-006), entre as instituições credenciadas.
+ * FE-05, FE-04 e FE-09: o paciente escolhe a quem liberar uma informação restrita (RF-009), o administrativo escolhe o
+ * destino de uma transferência (RF-006), e o auditor/gestor escolhe o hospital do painel, entre as credenciadas.
  */
 class InstituicoesDaRedeTest extends TesteIntegracao {
 
@@ -66,8 +66,17 @@ class InstituicoesDaRedeTest extends TesteIntegracao {
 		assertThat(JsonPath.<List<String>>read(corpo, "$[*].id")).contains(credenciada.getId().toString());
 	}
 
+	@Test
+	void auditorGestorTambemListaParaEscolherOHospitalNoPainel() throws Exception {
+		Instituicao credenciada = instituicao("Rede " + UUID.randomUUID().toString().substring(0, 8) + " Painel", true);
+		String corpo = mvc.perform(get("/api/instituicoes").with(user("gestor.da.rede").roles("AUDITOR_GESTOR")))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		assertThat(JsonPath.<List<String>>read(corpo, "$[*].id")).contains(credenciada.getId().toString());
+	}
+
 	@ParameterizedTest
-	@ValueSource(strings = { "MEDICO", "ENFERMEIRO", "AUDITOR_GESTOR" })
+	@ValueSource(strings = { "MEDICO", "ENFERMEIRO" })
 	void outrosPerfisNaoListam(String perfil) throws Exception {
 		mvc.perform(get("/api/instituicoes").with(user("profissional.qualquer").roles(perfil)))
 				.andExpect(status().isForbidden());
