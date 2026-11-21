@@ -12,16 +12,10 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Toda data e hora do back-end vem do relógio único (bean {@code Clock}, fuso em
- * {@code sigh.fuso-horario}). Pegar a hora direto do sistema faz o resultado depender do fuso do
- * servidor: com a JVM em UTC, a fila mostrava esperas 3 horas maiores.
- */
 class RelogioUnicoTest {
 
 	private static final Path CODIGO_DE_PRODUCAO = Path.of("src/main/java");
 
-	/** Só é permitido {@code now(clock)}; qualquer outra forma usa o relógio ou o fuso do sistema. */
 	private static final Pattern HORA_DO_SISTEMA = Pattern.compile(
 			"\\b(LocalDateTime|LocalDate|LocalTime|Instant|ZonedDateTime|OffsetDateTime|OffsetTime|Year|YearMonth|MonthDay)"
 					+ "\\s*(\\.now\\((?!\\s*clock\\s*\\))|::now\\b)"

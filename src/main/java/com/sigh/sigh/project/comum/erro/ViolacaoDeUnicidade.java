@@ -4,7 +4,6 @@ import org.hibernate.exception.ConstraintViolationException;
 
 import java.sql.SQLException;
 
-/** Identifica violação de UNIQUE no PostgreSQL (SQLState 23505) em qualquer ponto da cadeia de causas. */
 public final class ViolacaoDeUnicidade {
 
 	private static final String SQLSTATE_UNIQUE = "23505";
@@ -16,7 +15,6 @@ public final class ViolacaoDeUnicidade {
 		return SQLSTATE_UNIQUE.equals(sqlState(erro));
 	}
 
-	/** Nome da constraint violada informado pelo Hibernate (não contém valores das colunas), ou null. */
 	public static String restricao(Throwable erro) {
 		for (Throwable atual = erro; atual != null; atual = atual.getCause()) {
 			if (atual instanceof ConstraintViolationException violacao) {
@@ -29,7 +27,6 @@ public final class ViolacaoDeUnicidade {
 		return null;
 	}
 
-	/** SQLState da primeira SQLException da cadeia, ou null se não houver. */
 	public static String sqlState(Throwable erro) {
 		for (Throwable atual = erro; atual != null; atual = atual.getCause()) {
 			if (atual instanceof SQLException sql && sql.getSQLState() != null) {

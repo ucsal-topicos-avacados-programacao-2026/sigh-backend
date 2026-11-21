@@ -30,10 +30,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * BE-12: com a JVM em UTC (pom) e o relógio da aplicação em America/Bahia, a chegada, a confirmação
- * da triagem e o tempo de espera da fila (RN-005) saem do mesmo relógio e não ganham 3 horas.
- */
 class FilaComRelogioUnicoTest extends TesteIntegracao {
 
 	@Autowired
@@ -60,7 +56,6 @@ class FilaComRelogioUnicoTest extends TesteIntegracao {
 		assertThat(noPrazo.minutosDeEspera()).isEqualTo(30);
 		assertThat(noPrazo.tempoMaximoExcedido()).isFalse();
 
-		// Amarelo tolera 60 minutos (application.properties).
 		relogio.avancar(Duration.ofMinutes(31));
 		PacienteNaFilaDTO atrasado = naFila(hospital, atendimentoId, enfermeiro);
 		assertThat(atrasado.minutosDeEspera()).isEqualTo(61);

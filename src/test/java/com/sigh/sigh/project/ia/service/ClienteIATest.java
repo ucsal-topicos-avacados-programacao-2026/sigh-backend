@@ -25,8 +25,6 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 class ClienteIATest {
 
-	// Endereços diferentes só para o teste saber qual cliente fez o pedido: o da triagem tem o tempo-limite
-	// curto, e o do resumo, o longo.
 	private static final String ENDERECO_IA = "http://ia.triagem";
 	private static final String ENDERECO_IA_RESUMO = "http://ia.resumo";
 	private static final IAProperties CONFIGURACAO = new IAProperties(

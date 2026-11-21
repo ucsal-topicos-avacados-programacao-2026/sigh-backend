@@ -21,7 +21,6 @@ public record IAProperties(
 		@Positive int limiteRegistrosHistorico,
 		@NotNull Resource instrucoesTriagem,
 		@NotNull Resource instrucoesResumo,
-		// O resumo é gerado em segundo plano, um por vez: pode esperar mais que a sugestão da triagem.
 		@NotNull Duration tempoLimiteResumo,
 		@Positive int filaMaximaResumos,
 		boolean aquecerAoSubir) {

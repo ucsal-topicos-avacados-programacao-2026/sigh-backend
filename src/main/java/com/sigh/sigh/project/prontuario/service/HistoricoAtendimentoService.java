@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/** Consulta do histórico pelo médico ou enfermeiro do atendimento, comum ou de emergência (RF-009, RF-010). */
 @Service
 public class HistoricoAtendimentoService {
 
@@ -37,7 +36,6 @@ public class HistoricoAtendimentoService {
 	static final String FINALIDADE_EMERGENCIA = "Acesso de emergência";
 	static final String FINALIDADE_TENTATIVA_RECUSADA = "Tentativa de acesso de emergência recusada";
 	static final int JUSTIFICATIVA_MINIMA = 20;
-	/** Só o risco imediato justifica furar a restrição do paciente (BE-18). */
 	static final Set<CorRisco> GRAVES = Set.of(CorRisco.VERMELHO, CorRisco.LARANJA);
 
 	private final AtendimentoRepository atendimentoRepository;
@@ -74,17 +72,6 @@ public class HistoricoAtendimentoService {
 				historicoAutorizadoService.possuiInformacoesRestritas(atendimento), false);
 	}
 
-	/**
-	 * Só para atendimento em andamento: depois de encerrado não há mais risco iminente a justificar.
-	 * Os registros restritos voltam marcados, para o profissional saber o que o paciente quis proteger.
-	 *
-	 * <p>Controles contra abuso (BE-18): a classificação de risco confirmada mais recente do atendimento
-	 * precisa ser vermelha ou laranja, e o acesso só vale até {@code sigh.emergencia.janela} (12 h) depois
-	 * dela. Todo acesso entra na fila do auditor ({@code GET /auditoria/emergencias/pendentes}).
-	 *
-	 * <p>BE-24: quem confirmou a classificação não usa a emergência com base nela (precisa de outra
-	 * pessoa), e a tentativa recusada por essas regras fica na auditoria, para o auditor ver.
-	 */
 	@Transactional
 	public HistoricoDoAtendimentoDTO acessarEmEmergencia(UUID atendimentoId, String justificativa, String login) {
 		Atendimento atendimento = buscar(atendimentoId);
@@ -111,10 +98,6 @@ public class HistoricoAtendimentoService {
 				paraDTO(registros, historicoAutorizadoService.restritos(atendimento.getProntuario())), false, true);
 	}
 
-	/**
-	 * A tentativa recusada vai para a auditoria numa transação própria. Se a gravação falhar, a resposta
-	 * continua sendo a recusa (o acesso segue negado), com a falha anexada a ela.
-	 */
 	private void registrarTentativa(Atendimento atendimento, String login, Perfil perfil, String justificativa,
 			EmergenciaRecusadaException recusa) {
 		try {
@@ -127,10 +110,6 @@ public class HistoricoAtendimentoService {
 		}
 	}
 
-	/**
-	 * Risco imediato: a classificação confirmada mais recente é vermelha ou laranja, com quem a confirmou
-	 * identificado (sem isso, recusa), e não foi o próprio solicitante; e ainda está dentro da janela.
-	 */
 	private void exigirRiscoImediato(Atendimento atendimento, String login) {
 		Triagem classificacao = triagemRepository
 				.findFirstByAtendimentoIdAndCorConfirmadaIsNotNullOrderByConfirmadaEmDescIdDesc(atendimento.getId())
@@ -159,7 +138,6 @@ public class HistoricoAtendimentoService {
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Atendimento não encontrado."));
 	}
 
-	/** Médico ou enfermeiro com vínculo ativo na instituição do atendimento ("profissional autorizado"). */
 	private Perfil perfilNoAtendimento(Atendimento atendimento, String login) {
 		return vinculoService.perfilHabilitado(login, atendimento.getInstituicao().getId(), Perfil.MEDICO,
 				Perfil.ENFERMEIRO);

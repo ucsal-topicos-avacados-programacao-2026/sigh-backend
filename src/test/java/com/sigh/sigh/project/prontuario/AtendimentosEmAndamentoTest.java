@@ -26,10 +26,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * FE-07: o atendimento sai da fila de triagem quando o médico faz o primeiro registro. Esta lista é por onde o médico
- * volta ao paciente, e o enfermeiro acompanha quem está em atendimento na instituição.
- */
 class AtendimentosEmAndamentoTest extends TesteIntegracao {
 
 	private static final String TRIAGEM = """
@@ -85,7 +81,6 @@ class AtendimentosEmAndamentoTest extends TesteIntegracao {
 		assertThat(doMedicoA.get(1)).containsEntry("corConfirmada", null).containsEntry("medicoResponsavel", "Dr. Outro")
 				.containsEntry("doUsuarioLogado", false);
 
-		// O enfermeiro também vê, e nenhum é "dele".
 		assertThat(lista(enfermeiroA, "ENFERMEIRO")).extracting(a -> a.get("doUsuarioLogado")).containsOnly(false);
 	}
 
@@ -96,7 +91,6 @@ class AtendimentosEmAndamentoTest extends TesteIntegracao {
 		for (int i = 0; i < 5; i++) {
 			admitidos.add(admitir(hospitalA, "Paciente " + i, "Motivo"));
 		}
-		// Começam na ordem inversa da chegada: a lista segue o início do atendimento, e não a chegada.
 		for (int i = 4; i >= 0; i--) {
 			relogio.avancar(Duration.ofMinutes(1));
 			registrar(medicoA, admitidos.get(i));

@@ -20,7 +20,6 @@ public class AtendimentosEmAndamentoController {
 
 	private final AtendimentosEmAndamentoService atendimentosEmAndamentoService;
 
-	/** Atendimentos em andamento com o médico na instituição, que já saíram da fila de triagem (FE-07). */
 	@GetMapping("/em-andamento")
 	@PreAuthorize("hasAnyRole('MEDICO', 'ENFERMEIRO')")
 	public List<AtendimentoEmAndamentoDTO> emAndamento(@RequestParam UUID instituicaoId, Principal usuario) {

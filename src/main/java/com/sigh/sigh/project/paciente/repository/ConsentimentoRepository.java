@@ -16,7 +16,6 @@ public interface ConsentimentoRepository extends JpaRepository<Consentimento, UU
 	@Query("select coalesce(max(c.versao), 0) from Consentimento c where c.paciente.id = :pacienteId")
 	int ultimaVersao(@Param("pacienteId") UUID pacienteId);
 
-	/** Decisões sobre o compartilhamento amplo na rede (sem alvo específico), da mais recente para a mais antiga. */
 	@Query("""
 			select c from Consentimento c
 			where c.paciente.id = :pacienteId and c.tipo = :tipo
@@ -29,7 +28,6 @@ public interface ConsentimentoRepository extends JpaRepository<Consentimento, UU
 	@Query("select c from Consentimento c where c.paciente.id = :pacienteId order by c.versao asc")
 	List<Consentimento> historico(@Param("pacienteId") UUID pacienteId);
 
-	/** Autorizações adicionais (RF-009) ainda não revogadas; a revogação é a versão que aponta para elas. */
 	@Query("""
 			select c from Consentimento c
 			join fetch c.destinataria

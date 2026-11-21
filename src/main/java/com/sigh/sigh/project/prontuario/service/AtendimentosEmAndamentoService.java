@@ -21,10 +21,6 @@ public class AtendimentosEmAndamentoService {
 	private final TriagemRepository triagemRepository;
 	private final VinculoService vinculoService;
 
-	/**
-	 * Atendimentos em andamento na instituição (FE-07): o médico volta ao paciente que já atendeu, e o enfermeiro
-	 * acompanha quem está em atendimento. Exige vínculo de médico ou enfermeiro com a instituição.
-	 */
 	@Transactional(readOnly = true)
 	public List<AtendimentoEmAndamentoDTO> emAndamento(UUID instituicaoId, String login) {
 		vinculoService.exigirVinculoAtivo(login, instituicaoId, Perfil.MEDICO, Perfil.ENFERMEIRO);

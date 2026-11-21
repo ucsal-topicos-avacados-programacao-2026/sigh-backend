@@ -11,16 +11,11 @@ import jakarta.persistence.Transient;
 
 import java.util.UUID;
 
-/**
- * Entidades de exemplo com campo cifrado mal configurado, para o CamposCifradosTest. Ficam fora do
- * pacote da aplicação para o Hibernate e a varredura de entidades não as encontrarem.
- */
 public final class EntidadesMalConfiguradas {
 
 	private EntidadesMalConfiguradas() {
 	}
 
-	/** Setter gerado do jeito do Lombok: não marca o campo gravado como pendente, e a alteração se perderia. */
 	@Entity
 	@EntityListeners(CifragemDasEntidades.class)
 	@Table(name = "exemplo")
@@ -85,7 +80,6 @@ public final class EntidadesMalConfiguradas {
 		}
 	}
 
-	/** Superclasse com campo cifrado: o listener só olha a entidade, então o campo nunca seria gravado. */
 	@jakarta.persistence.MappedSuperclass
 	public static class BaseComCampoCifrado {
 		@Transient
@@ -103,7 +97,6 @@ public final class EntidadesMalConfiguradas {
 		private UUID id;
 	}
 
-	/** Sem setter: o único jeito de mudar o valor seria por fora do contrato do PENDENTE. */
 	@Entity
 	@EntityListeners(CifragemDasEntidades.class)
 	@Table(name = "exemplo")

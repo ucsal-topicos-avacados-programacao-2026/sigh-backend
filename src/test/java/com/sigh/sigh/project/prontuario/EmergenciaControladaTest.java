@@ -29,17 +29,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * BE-18 (RF-010, RF-011, RN-003): controles contra o abuso do acesso de emergência, decididos pelo
- * grupo em 20/11/2026, sem teto numérico de acessos:
- * <ul>
- * <li>gravidade: só com a classificação de risco confirmada mais recente vermelha ou laranja;</li>
- * <li>janela: só até 12 horas depois dessa classificação;</li>
- * <li>revisão obrigatória: todo acesso de emergência fica na fila do auditor até uma análise conclusiva.</li>
- * </ul>
- * E os do BE-24: reclassificação durante o atendimento, quem classifica não usa a emergência com base
- * na própria classificação, e a tentativa recusada fica na auditoria.
- */
 class EmergenciaControladaTest extends TesteIntegracao {
 
 	private static final String JUSTIFICATIVA = "{\"justificativa\":\"Parada cardiorrespiratória na sala vermelha\"}";
@@ -86,10 +75,6 @@ class EmergenciaControladaTest extends TesteIntegracao {
 				.andExpect(jsonPath("$[?(@.instituicaoId == '" + hospital.getId() + "')]").isEmpty());
 	}
 
-	/**
-	 * BE-24: o paciente já com o médico pode ser reclassificado. O que piora durante o atendimento (ou
-	 * nunca passou por triagem) ganha a emergência; a janela recomeça a cada reclassificação.
-	 */
 	@Test
 	void reclassificacaoDuranteOAtendimentoRenovaAEmergencia() throws Exception {
 		mvc.perform(post("/atendimentos/{id}/registros", atendimentoId).with(user(medico).roles("MEDICO")).with(csrf())
@@ -109,7 +94,6 @@ class EmergenciaControladaTest extends TesteIntegracao {
 		emergencia().andExpect(status().isOk());
 	}
 
-	/** BE-24: quem confirmou a classificação não usa a emergência com base nela; outra pessoa, sim. */
 	@Test
 	void quemConfirmouAClassificacaoNaoUsaAEmergenciaComBaseNela() throws Exception {
 		String enfermeiro = cenario.profissional(hospital, Perfil.ENFERMEIRO);
@@ -123,7 +107,6 @@ class EmergenciaControladaTest extends TesteIntegracao {
 		emergencia().andExpect(status().isOk());
 	}
 
-	/** Classificação sem confirmador identificado (só por dado gravado fora da aplicação) não libera nada. */
 	@Test
 	void classificacaoSemConfirmadorNaoLiberaAEmergencia() throws Exception {
 		UUID triagem = cenario.classificarRisco(atendimentoId, hospital, CorRisco.VERMELHO);
@@ -132,7 +115,6 @@ class EmergenciaControladaTest extends TesteIntegracao {
 		emergencia().andExpect(status().isUnprocessableContent());
 	}
 
-	/** A regra olha quem confirmou a classificação, não quem registrou a triagem. */
 	@Test
 	void valeQuemConfirmouENaoQuemRegistrouATriagem() throws Exception {
 		String registrou = cenario.profissional(hospital, Perfil.ENFERMEIRO);
@@ -158,7 +140,6 @@ class EmergenciaControladaTest extends TesteIntegracao {
 		assertThat(tentativasRecusadas("fora da janela depois da classificação")).isOne();
 	}
 
-	/** Vale a classificação mais recente: o paciente que melhora perde a emergência, o que piora a recupera. */
 	@Test
 	void valeAClassificacaoMaisRecente() throws Exception {
 		cenario.classificarRisco(atendimentoId, hospital, CorRisco.VERMELHO);
@@ -171,12 +152,10 @@ class EmergenciaControladaTest extends TesteIntegracao {
 		emergencia().andExpect(status().isOk());
 	}
 
-	/** Todo acesso de emergência entra na fila do auditor e só sai com uma análise conclusiva. */
 	@Test
 	void acessoDeEmergenciaFicaNaFilaDoAuditorAteAAnaliseConclusiva() throws Exception {
 		cenario.classificarRisco(atendimentoId, hospital, CorRisco.VERMELHO);
 		emergencia().andExpect(status().isOk());
-		// Consulta comum, com um registro a ver (é o acesso a registros que vai para a auditoria): não entra na fila.
 		cenario.registroClinico(pacienteId, hospital, "Cardiologia", "Hipertensão arterial");
 		mvc.perform(get("/atendimentos/{id}/historico", atendimentoId).with(user(medico).roles("MEDICO")))
 				.andExpect(status().isOk());
@@ -210,7 +189,6 @@ class EmergenciaControladaTest extends TesteIntegracao {
 				.contentType(MediaType.APPLICATION_JSON).content(JUSTIFICATIVA));
 	}
 
-	/** Tentativas recusadas na auditoria do paciente, com o motivo exato. */
 	private Integer tentativasRecusadas(String motivo) {
 		return jdbc.queryForObject("select count(*) from registro_auditoria where not emergencia and prontuario_id ="
 				+ " (select id from prontuario where paciente_id = ?) and finalidade_declarada = ?", Integer.class,
@@ -221,10 +199,6 @@ class EmergenciaControladaTest extends TesteIntegracao {
 		return jdbc.queryForObject("select status from atendimento where id = ?", String.class, atendimentoId);
 	}
 
-	/**
-	 * Id e justificativa de todos os acessos da fila, página a página: o banco é compartilhado com os
-	 * outros testes, então o acesso deste teste pode estar em qualquer página.
-	 */
 	private Map<String, String> filaInteira(String auditor) throws Exception {
 		Map<String, String> pendentes = new LinkedHashMap<>();
 		for (int pagina = 0; ; pagina++) {

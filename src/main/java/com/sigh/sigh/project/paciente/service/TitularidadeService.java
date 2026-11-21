@@ -16,11 +16,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Quem pode gerenciar os dados de um paciente: o próprio titular (conta vinculada ao cadastro) ou o
- * representante legal com representação vigente (RF-002, RF-009). Paciente inexistente e sem
- * permissão dão a mesma resposta, para não revelar quem está cadastrado.
- */
 @Service
 @RequiredArgsConstructor
 public class TitularidadeService {
@@ -41,7 +36,6 @@ public class TitularidadeService {
 		throw new AccessDeniedException(SEM_PERMISSAO);
 	}
 
-	/** O próprio paciente, e não um representante. */
 	public boolean ehTitular(Paciente paciente, String login) {
 		return paciente.getConta() != null && paciente.getConta().getLogin().equals(login);
 	}

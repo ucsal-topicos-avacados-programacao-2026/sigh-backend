@@ -38,11 +38,6 @@ public class PainelService {
 	private final TempoMaximoEsperaProperties tempoMaximoEspera;
 	private final Clock clock;
 
-	/**
-	 * Números da instituição agora (FE-09). O auditor/gestor vê qualquer instituição da rede, como nos indicadores
-	 * de auditoria (RF-011). Médico, enfermeiro e administrativo precisam de vínculo ativo com ela (RF-012): sem
-	 * vínculo, 403 antes de procurar a instituição, para não revelar se ela existe.
-	 */
 	@Transactional(readOnly = true)
 	public PainelDaInstituicaoDTO daInstituicao(UUID instituicaoId, String login, boolean gestorDaRede) {
 		if (!gestorDaRede) {
@@ -68,14 +63,12 @@ public class PainelService {
 						painelRepository.transferenciasEnviadasPendentes(instituicaoId)));
 	}
 
-	/** Na ordem das categorias e das situações, para a resposta não depender da ordem do banco. */
 	private List<LeitosDoPainelDTO> leitos(UUID instituicaoId) {
 		return painelRepository.leitos(instituicaoId).stream()
 				.sorted(Comparator.comparing(LeitosDoPainelDTO::categoria).thenComparing(LeitosDoPainelDTO::status))
 				.toList();
 	}
 
-	/** As cinco cores, mesmo sem ninguém, com o mesmo critério de tempo máximo da fila do enfermeiro. */
 	private List<RiscoNaFilaDTO> fila(List<ChegadaNaFila> naFila, LocalDateTime agora) {
 		return Arrays.stream(CorRisco.values()).map(cor -> {
 			Duration tempoMaximo = tempoMaximoEspera.da(cor);

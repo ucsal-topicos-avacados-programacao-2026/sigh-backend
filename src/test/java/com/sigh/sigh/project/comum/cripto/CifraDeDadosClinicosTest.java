@@ -13,10 +13,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * RNF-004: AES-256-GCM com IV aleatório, detecção de adulteração, rotação de chave e valor preso à
- * coluna e à linha (BE-22).
- */
 class CifraDeDadosClinicosTest {
 
 	private static final byte[] BYTES_A = "chave-ficticia-a-de-32-bytes-!!!".getBytes(StandardCharsets.UTF_8);
@@ -40,7 +36,6 @@ class CifraDeDadosClinicosTest {
 		assertThat(cifra.cifrar("Asma", CONTEUDO, LINHA)).isNotEqualTo(cifra.cifrar("Asma", CONTEUDO, LINHA));
 	}
 
-	/** Critério de aceite do BE-22: valor copiado de outra linha (ou de outra coluna) não é decifrado. */
 	@Test
 	void valorCopiadoParaOutraLinhaOuOutraColunaNaoEhDecifrado() {
 		String gravado = cifra.cifrar("HIV positivo", CONTEUDO, LINHA);
@@ -88,10 +83,6 @@ class CifraDeDadosClinicosTest {
 		assertThat(rotacionada.prefixoDaChaveAtual()).isEqualTo("sigh:v2:2:");
 	}
 
-	/**
-	 * Critério de aceite do BE-22: texto claro gravado direto no banco não é aceito como dado. O formato
-	 * antigo, sem vínculo à linha, também não: só a leitura de legado (migração e auditoria) os lê.
-	 */
 	@Test
 	void textoClaroEFormatoAntigoSoSaoLidosComoLegado() throws Exception {
 		String v1 = formatoAntigo("Tuberculose");
@@ -136,7 +127,6 @@ class CifraDeDadosClinicosTest {
 				.isInstanceOf(IllegalStateException.class).hasMessageContaining("repetido");
 	}
 
-	/** Valor como o BE-09 gravava: sigh:v1, AES-GCM sem dado autenticado adicional. */
 	static String formatoAntigo(String texto) throws Exception {
 		byte[] iv = new byte[12];
 		Cipher aes = Cipher.getInstance("AES/GCM/NoPadding");

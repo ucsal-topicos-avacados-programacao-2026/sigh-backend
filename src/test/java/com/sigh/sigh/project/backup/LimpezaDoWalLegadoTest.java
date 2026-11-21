@@ -23,12 +23,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * BE-26 (RNF-004): o dado clínico que entrou em claro antes da cifragem fica nos segmentos de WAL do servidor,
- * inclusive em segmentos antigos reaproveitados para uso futuro (achado do TST-04). Depois do
- * limpar-wal-legado.sh, ele não existe mais em nenhum arquivo de pg_wal. Usa a mesma imagem e o mesmo
- * script de produção.
- */
 class LimpezaDoWalLegadoTest {
 
 	private static final String PG_WAL = "/var/lib/postgresql/data/pg_wal";
@@ -66,16 +60,12 @@ class LimpezaDoWalLegadoTest {
 	void dadoLegadoSaiDeTodosOsSegmentosDoServidorInclusiveDosReaproveitados() throws Exception {
 		assertThat(jdbc.queryForObject("show wal_recycle", String.class)).as("a imagem sobe sem reaproveitar WAL")
 				.isEqualTo("off");
-		// Com o WAL comprimido, a busca do texto não o acharia mesmo presente: o controle negativo não valeria.
 		assertThat(jdbc.queryForObject("show wal_compression", String.class)).isEqualTo("off");
 		UUID registro = inserirRegistroLegado();
 		assertThat(manutencao.executar().cifrados()).as("a migração cifra o dado legado").isEqualTo(2);
 		assertThat(noWal(MARCADOR_CLINICO)).as("controle: o WAL da migração tem o dado em claro").isTrue();
-		// O cenário do TST-04: um segmento antigo, com o dado, renomeado para uso futuro (como faz o wal_recycle).
 		String segmentoComODado = rodar("LC_ALL=C grep -r -a -l -F '" + MARCADOR_CLINICO + "' " + PG_WAL + " | head -1")
 				.getStdout().strip();
-		// Dezesseis adiante: mais longe do que as trocas de segmento da limpeza alcançam sem um enchimento que chegue
-		// até ele (e mais do que a quantidade de segmentos que existiam).
 		String futuro = segmentoFuturo(jdbc.queryForObject("select pg_walfile_name(pg_current_wal_lsn())", String.class), 16);
 		rodar("cp " + segmentoComODado + " " + PG_WAL + "/" + futuro + " && chown postgres:postgres " + PG_WAL + "/" + futuro);
 
@@ -94,7 +84,6 @@ class LimpezaDoWalLegadoTest {
 
 	@Test
 	void arquivamentoParadoFazALimpezaFalharDizendoOMotivo() throws Exception {
-		// O arquivamento roda como postgres: sem permissão na pasta, ele falha e o servidor não apaga o segmento.
 		rodar("chmod 000 /wal");
 		try {
 			ExecResult limpeza = banco.execInContainer("sh", "-c", "SIGH_LIMPEZA_ESPERA=5 limpar-wal-legado.sh");
@@ -119,7 +108,6 @@ class LimpezaDoWalLegadoTest {
 		}
 	}
 
-	/** Paciente com um diagnóstico gravado em claro, como um dado de antes da cifragem. */
 	private static UUID inserirRegistroLegado() {
 		UUID instituicao = UUID.randomUUID();
 		UUID autor = UUID.randomUUID();
@@ -142,14 +130,12 @@ class LimpezaDoWalLegadoTest {
 		return registro;
 	}
 
-	/** O nome do segmento {@code adiante} posições depois, na mesma linha do tempo (segmentos de 16 MB). */
 	static String segmentoFuturo(String atual, int adiante) {
 		long posicao = Long.parseLong(atual.substring(8, 16), 16) * 256 + Long.parseLong(atual.substring(16, 24), 16)
 				+ adiante;
 		return atual.substring(0, 8) + String.format("%08X%08X", posicao / 256, posicao % 256);
 	}
 
-	/** Busca em bytes (LC_ALL=C), em todos os arquivos de pg_wal. */
 	private static boolean noWal(String texto) throws Exception {
 		ExecResult busca = banco.execInContainer("sh", "-c", "LC_ALL=C grep -r -a -l -F '" + texto + "' " + PG_WAL);
 		assertThat(busca.getExitCode()).as(busca.getStderr()).isIn(0, 1);

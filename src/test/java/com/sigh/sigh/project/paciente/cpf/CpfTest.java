@@ -25,17 +25,17 @@ class CpfTest {
 	@ParameterizedTest
 	@NullAndEmptySource
 	@ValueSource(strings = {
-			"52998224724",      // segundo dígito verificador errado
-			"52998224715",      // primeiro dígito verificador errado
-			"11111111111",      // todos os dígitos iguais
+			"52998224724",
+			"52998224715",
+			"11111111111",
 			"00000000000",
-			"5299822472",       // 10 dígitos
-			"529982247250",     // 12 dígitos
-			"529.982.247/25",   // separador inválido
+			"5299822472",
+			"529982247250",
+			"529.982.247/25",
 			"529 982 247 25",
-			"52998224a25",      // letra
+			"52998224a25",
 			"   ",
-			"5299822472５"       // dígito não ASCII
+			"5299822472５"
 	})
 	void rejeitaCpfInvalido(String cpf) {
 		assertThat(Cpf.ehValido(cpf)).isFalse();

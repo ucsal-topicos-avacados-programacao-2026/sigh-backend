@@ -28,10 +28,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * BE-27 (FE-09): os números da instituição para o painel. Só contagens e tempos, com as mesmas regras das listas do
- * enfermeiro e do administrativo; nenhum dado de paciente.
- */
 class PainelDaInstituicaoTest extends TesteIntegracao {
 
 	private static final String TRIAGEM = """
@@ -70,7 +66,6 @@ class PainelDaInstituicaoTest extends TesteIntegracao {
 		classificar(reclassificado, "VERDE");
 		relogio.avancar(Duration.ofMinutes(10));
 		classificar(reclassificado, "LARANJA");
-		// Triagem começada e não confirmada: continua aguardando triagem.
 		como(enfermeiroA, "ENFERMEIRO", post("/triagens").content(TRIAGEM.formatted(admitir(hospitalA))))
 				.andExpect(status().isCreated());
 		UUID internado = admitir(hospitalA);
@@ -83,12 +78,10 @@ class PainelDaInstituicaoTest extends TesteIntegracao {
 		UUID internacao = internar(administrativoA, internado, enfermariaOcupada);
 		relogio.avancar(Duration.ofMinutes(20));
 		classificar(admitir(hospitalA), "AMARELO");
-		// Encerrados: um chegou no último segundo de ontem, o outro à meia-noite de hoje.
 		LocalDateTime meiaNoite = LocalDate.now(relogio).atStartOfDay();
 		encerrarComChegada(admitir(hospitalA), meiaNoite.minusSeconds(1));
 		encerrarComChegada(admitir(hospitalA), meiaNoite);
 
-		// O outro hospital: quem aguarda, um internado e um pedido de transferência para o hospital A.
 		String administrativoB = cenario.administrativo(hospitalB);
 		admitir(hospitalB);
 		UUID internacaoB = internar(administrativoB, admitir(hospitalB), leito(administrativoB, hospitalB, "ENFERMARIA"));
@@ -117,10 +110,8 @@ class PainelDaInstituicaoTest extends TesteIntegracao {
 		assertThat(fila).extracting(item -> item.get("cor")).containsExactly("VERMELHO", "LARANJA", "AMARELO", "VERDE", "AZUL");
 		assertThat(fila.get(0)).containsEntry("quantidade", 0).containsEntry("maiorEsperaMinutos", null)
 				.containsEntry("tempoMaximoMinutos", 0).containsEntry("acimaDoTempoMaximo", 0);
-		// O reclassificado conta só na cor mais recente, e passou dos 10 minutos do laranja.
 		assertThat(fila.get(1)).containsEntry("quantidade", 1).containsEntry("maiorEsperaMinutos", 40)
 				.containsEntry("tempoMaximoMinutos", 10).containsEntry("acimaDoTempoMaximo", 1);
-		// Dois amarelos: o de 90 minutos passou dos 60; o de 10, não.
 		assertThat(fila.get(2)).containsEntry("quantidade", 2).containsEntry("maiorEsperaMinutos", 90)
 				.containsEntry("tempoMaximoMinutos", 60).containsEntry("acimaDoTempoMaximo", 1);
 		assertThat(fila.get(3)).containsEntry("quantidade", 1).containsEntry("maiorEsperaMinutos", 40)
@@ -128,7 +119,6 @@ class PainelDaInstituicaoTest extends TesteIntegracao {
 		assertThat(fila.get(4)).containsEntry("quantidade", 0).containsEntry("tempoMaximoMinutos", 240);
 		assertThat(JsonPath.<Map<String, Object>>read(corpo, "$.transferencias"))
 				.isEqualTo(Map.of("recebidas", 1, "enviadas", 1));
-		// Nenhum nome nem motivo de paciente na resposta.
 		assertThat(corpo).doesNotContain(NOME).doesNotContain(MOTIVO);
 	}
 
@@ -139,10 +129,8 @@ class PainelDaInstituicaoTest extends TesteIntegracao {
 		UUID primeiro = leito(administrativoA, hospitalA, "ENFERMARIA");
 		UUID segundo = leito(administrativoA, hospitalA, "ENFERMARIA");
 		UUID internacao = internar(administrativoA, internado, primeiro);
-		// Transferência dentro do hospital: a ocupação do primeiro leito termina e começa a do segundo.
 		como(administrativoA, "ADMINISTRATIVO", post("/internacoes/{id}/transferencia", internacao)
 				.content("{\"leitoDestinoId\":\"%s\"}".formatted(segundo))).andExpect(status().isOk());
-		// Dois pedidos chegam do hospital B; o hospital A envia um.
 		String administrativoB = cenario.administrativo(hospitalB);
 		for (int i = 0; i < 2; i++) {
 			UUID internacaoB = internar(administrativoB, admitir(hospitalB),

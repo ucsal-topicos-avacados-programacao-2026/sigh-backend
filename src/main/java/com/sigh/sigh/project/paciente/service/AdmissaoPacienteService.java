@@ -32,10 +32,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Cadastro único de paciente por CPF na rede (RF-001, RN-004).
- * Operações do perfil Recepção, sempre no contexto de uma instituição à qual ele está vinculado.
- */
 @Service
 public class AdmissaoPacienteService {
 
@@ -61,7 +57,6 @@ public class AdmissaoPacienteService {
 		this.clock = clock;
 	}
 
-	/** Verifica se o CPF já está cadastrado na rede antes de um novo cadastro. */
 	@Transactional(readOnly = true)
 	public PacienteResumoResponse buscarPorCpf(BuscaPacienteRequest requisicao, String login) {
 		instituicaoAutorizada(login, requisicao.instituicaoId(), agora());
@@ -70,11 +65,6 @@ public class AdmissaoPacienteService {
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Paciente não encontrado na rede."));
 	}
 
-	/**
-	 * Abre um atendimento para o paciente na instituição. Se o CPF já existe na rede, o atendimento
-	 * é vinculado ao prontuário existente e os dados cadastrais e o consentimento não são alterados.
-	 * Caso contrário, cria paciente, prontuário e (se houver manifestação) o consentimento inicial.
-	 */
 	@Transactional
 	public AdmissaoResponse admitir(AdmissaoRequest requisicao, String login) {
 		LocalDateTime agora = agora();
@@ -103,16 +93,11 @@ public class AdmissaoPacienteService {
 		atendimento.setMotivo(requisicao.motivo().strip());
 		atendimento.setStatus(StatusAtendimento.ABERTO);
 		atendimentoRepository.save(atendimento);
-		// O que o paciente sente já vira a triagem, e a IA sugere a cor em segundo plano depois da gravação.
 		triagemService.abrirNaAdmissao(atendimento, login);
 
 		return new AdmissaoResponse(paciente.getId(), prontuario.getId(), atendimento.getId(), existente.isEmpty());
 	}
 
-	/**
-	 * O usuário precisa ter vínculo ativo com a instituição e o perfil Recepção habilitado nela.
-	 * A checagem vem antes de qualquer consulta ao paciente, para não revelar dados a quem não pode vê-los.
-	 */
 	private Instituicao instituicaoAutorizada(String login, UUID instituicaoId, LocalDateTime agora) {
 		if (!vinculoRepository.existeVinculoAtivo(login, instituicaoId, Perfil.RECEPCAO, agora)) {
 			throw new AccessDeniedException("Sem vínculo de recepção ativo com a instituição.");
@@ -125,7 +110,6 @@ public class AdmissaoPacienteService {
 		return instituicao;
 	}
 
-	/** Hora atual na mesma precisão do PostgreSQL (microssegundos). */
 	private LocalDateTime agora() {
 		return LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
 	}
@@ -145,8 +129,6 @@ public class AdmissaoPacienteService {
 		paciente.setCpf(Cpf.normalizar(requisicao.cpf()));
 		paciente.setNome(requisicao.nome().strip());
 		paciente.setDataNascimento(requisicao.dataNascimento());
-		// Em cadastros simultâneos do mesmo CPF, a UNIQUE do banco falha aqui; o controller
-		// repete a admissão uma vez, já encontrando o cadastro existente.
 		return pacienteRepository.saveAndFlush(paciente);
 	}
 

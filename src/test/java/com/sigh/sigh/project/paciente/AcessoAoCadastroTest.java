@@ -28,7 +28,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** BE-15: a Recepção liga a conta do paciente e registra o representante legal. */
 class AcessoAoCadastroTest extends TesteIntegracao {
 
 	@Autowired
@@ -78,7 +77,6 @@ class AcessoAoCadastroTest extends TesteIntegracao {
 				.andExpect(status().isUnprocessableContent());
 	}
 
-	/** Quem não tem relação com o paciente não consegue dar acesso aos dados dele. */
 	@Test
 	void soRecepcaoComVinculoNumaInstituicaoQueAtendeuOPacienteDaAcesso() throws Exception {
 		Instituicao outra = cenario.instituicao(true);
@@ -123,7 +121,6 @@ class AcessoAoCadastroTest extends TesteIntegracao {
 				.andExpect(status().isForbidden());
 	}
 
-	/** Dar acesso ao prontuário a alguém fica na auditoria imutável, com quem fez e em qual instituição. */
 	@Test
 	void vinculoDeContaERepresentacaoFicamNaAuditoria() throws Exception {
 		vincularConta(recepcao, hospital, cenario.usuario(Perfil.PACIENTE).getLogin()).andExpect(status().isNoContent());

@@ -7,11 +7,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.stereotype.Component;
 
-/**
- * Ao subir, antes de o servidor web aceitar pedidos: o resumo que estava na fila da memória quando a
- * aplicação parou não será mais gerado, então vira falho, e o médico vê que precisa pedir de novo.
- * Supõe uma instância só da aplicação, como a fila.
- */
 @Component
 @RequiredArgsConstructor
 public class RecuperacaoDosResumos implements SmartInitializingSingleton {

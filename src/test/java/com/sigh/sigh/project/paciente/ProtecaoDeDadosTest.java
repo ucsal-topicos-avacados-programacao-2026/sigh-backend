@@ -30,7 +30,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** O CPF não pode aparecer em logs nem em mensagens de erro (RNF-003). */
 @ExtendWith(OutputCaptureExtension.class)
 class ProtecaoDeDadosTest extends TesteIntegracao {
 
@@ -75,7 +74,6 @@ class ProtecaoDeDadosTest extends TesteIntegracao {
 		assertThat(saida.getAll()).doesNotContain(cpf).doesNotContain(Cenario.comMascara(cpf));
 	}
 
-	/** A V3 impede duas decisões com a mesma versão para o mesmo paciente. */
 	@Test
 	void versaoDeConsentimentoRepetidaEhBarradaPeloBanco() {
 		Paciente paciente = pacienteRepository.saveAndFlush(paciente(Cenario.novoCpf()));

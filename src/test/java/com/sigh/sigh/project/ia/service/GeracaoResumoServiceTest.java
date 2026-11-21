@@ -27,7 +27,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** A fila simulada roda a tarefa na hora; o teste da fila de verdade fica em ResumoEmSegundoPlanoTest. */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class GeracaoResumoServiceTest {

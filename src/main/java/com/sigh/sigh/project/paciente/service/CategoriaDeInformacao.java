@@ -4,17 +4,11 @@ import com.sigh.sigh.project.prontuario.repository.RegistroClinicoRepository;
 
 import java.util.Locale;
 
-/**
- * Comparação de categorias de informação (RF-009), que são texto livre: ignora maiúsculas, acentos e
- * espaços repetidos. Usa a mesma tabela de acentos das consultas em {@link RegistroClinicoRepository},
- * para que Java e banco decidam igual.
- */
 final class CategoriaDeInformacao {
 
 	private CategoriaDeInformacao() {
 	}
 
-	/** Como a categoria é gravada: espaços em branco colapsados e sem espaços nas pontas (mesma ordem do banco). */
 	static String apresentavel(String categoria) {
 		return categoria.replaceAll("\\s+", " ").strip();
 	}

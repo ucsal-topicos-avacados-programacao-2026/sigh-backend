@@ -3,7 +3,6 @@ package com.sigh.sigh.project.comum.erro;
 import java.io.Serial;
 import java.util.Map;
 
-/** Campos obrigatórios conforme o contexto da operação (HTTP 400). */
 public class DadosInvalidosException extends RuntimeException {
 
 	@Serial

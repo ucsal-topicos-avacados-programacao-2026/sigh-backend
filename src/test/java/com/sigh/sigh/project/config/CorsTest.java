@@ -10,7 +10,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** FE-02: o front-end de outra origem só chama a API se a origem estiver em sigh.cors.origens-permitidas. */
 @TestPropertySource(properties = "sigh.cors.origens-permitidas=http://localhost:5173, https://sigh.local")
 class CorsTest extends TesteIntegracao {
 
@@ -41,7 +40,6 @@ class CorsTest extends TesteIntegracao {
 				.andExpect(header().string("Access-Control-Allow-Methods", org.hamcrest.Matchers.containsString("PATCH")));
 	}
 
-	/** Sessão expirada: o 401 chega ao front com o cabeçalho de CORS, senão o navegador mostraria só erro de rede. */
 	@Test
 	void respostaSemTokenChegaAoFrontComOCabecalhoDeCors() throws Exception {
 		mvc.perform(get("/usuarios/eu").header("Origin", "http://localhost:5173"))

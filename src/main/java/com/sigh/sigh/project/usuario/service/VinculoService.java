@@ -11,11 +11,6 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-/**
- * Controle de acesso por instituição (RF-012): ter o perfil não basta, o usuário precisa de vínculo
- * ativo com a instituição dos dados e do perfil habilitado nela. Sem isso, a resposta é 403 e nada
- * do recurso é revelado.
- */
 @Service
 @RequiredArgsConstructor
 public class VinculoService {
@@ -25,16 +20,11 @@ public class VinculoService {
 	private final VinculoInstitucionalRepository vinculoRepository;
 	private final Clock clock;
 
-	/** Exige vínculo ativo com a instituição e pelo menos um dos perfis habilitado nela. */
 	@Transactional(readOnly = true)
 	public void exigirVinculoAtivo(String login, UUID instituicaoId, Perfil... perfis) {
 		perfilHabilitado(login, instituicaoId, perfis);
 	}
 
-	/**
-	 * Primeiro perfil da lista que o usuário tem habilitado na instituição, para registrar na
-	 * auditoria com qual perfil o acesso foi feito.
-	 */
 	@Transactional(readOnly = true)
 	public Perfil perfilHabilitado(String login, UUID instituicaoId, Perfil... perfis) {
 		if (login == null || instituicaoId == null) {

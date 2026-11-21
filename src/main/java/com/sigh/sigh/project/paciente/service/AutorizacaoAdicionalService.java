@@ -25,11 +25,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Autorização adicional explícita (RF-009): o paciente ou representante libera para uma instituição
- * uma categoria ou um registro restrito. Cada concessão e cada revogação é uma nova versão do
- * consentimento (tipo ADICIONAL), ligada à anterior; nada é alterado ou apagado.
- */
 @Service
 @RequiredArgsConstructor
 public class AutorizacaoAdicionalService {
@@ -106,7 +101,6 @@ public class AutorizacaoAdicionalService {
 		return CategoriaDeInformacao.mesma(vigente.getCategoriaAlvo(), alvo.categoria());
 	}
 
-	/** Hora atual na mesma precisão do PostgreSQL (microssegundos). */
 	private LocalDateTime agora() {
 		return LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
 	}
