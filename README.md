@@ -121,6 +121,8 @@ Os dois pontos estão provados em `UsuarioLogadoTest` e `CorsTest`.
 
 Provado em `InternacoesDaInstituicaoTest` e, para o vínculo, no `VinculoEmTodaRotaTest`.
 
+**Quem aguarda triagem (FE-06):** `GET /triagens/aguardando?instituicaoId=`, só para o enfermeiro com vínculo na instituição. Lista os atendimentos em aberto ou em triagem sem classificação de risco confirmada, por ordem de chegada, com a triagem começada e não confirmada, se houver (id, sintomas e a sugestão da IA). Quem já tem a classificação confirmada está em `GET /triagens/fila`. Provado em `AguardandoTriagemTest`.
+
 ## Desempenho e carga (RNF-001, RNF-002)
 
 O relatório do teste de carga, da medição da IA, da inspeção da criptografia e do ensaio de restauração está em [`carga/README.md`](carga/README.md), com os scripts para reproduzir.

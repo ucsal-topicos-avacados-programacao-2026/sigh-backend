@@ -1,5 +1,6 @@
 package com.sigh.sigh.project.triagem.controller;
 
+import com.sigh.sigh.project.triagem.dto.AguardandoTriagemDTO;
 import com.sigh.sigh.project.triagem.dto.ConfirmacaoRiscoRequestDTO;
 import com.sigh.sigh.project.triagem.dto.PacienteNaFilaDTO;
 import com.sigh.sigh.project.triagem.dto.TriagemRequestDTO;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.security.Principal;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -33,6 +35,13 @@ public class TriagemController {
 	private final TriagemService triagemService;
 	private final FilaAtendimentoService filaAtendimentoService;
 	private final SugestaoRiscoService sugestaoRiscoService;
+
+	/** Quem aguarda triagem na instituição, com a triagem começada e não confirmada, se houver (FE-06). */
+	@GetMapping("/aguardando")
+	@PreAuthorize("hasRole('ENFERMEIRO')")
+	public List<AguardandoTriagemDTO> aguardando(@RequestParam UUID instituicaoId, Principal usuario) {
+		return filaAtendimentoService.aguardandoTriagem(instituicaoId, usuario.getName());
+	}
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
