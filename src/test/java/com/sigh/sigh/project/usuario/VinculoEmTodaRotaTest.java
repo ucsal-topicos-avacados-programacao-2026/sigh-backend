@@ -45,34 +45,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * BE-20 (RF-012): toda rota de médico, enfermeiro ou administrativo exige vínculo ativo com a
- * instituição dos dados. As rotas vêm do próprio Spring, não de uma lista escrita à mão: uma rota nova
- * sem caso aqui faz o teste falhar, e o caso dela só passa se quem não tem vínculo receber 403.
- *
- * <p>Para cada rota e para cada perfil de instituição que ela aceita:
- * <ul>
- * <li>um usuário com o perfil e sem vínculo nenhum recebe 403;</li>
- * <li>um usuário com o perfil e vínculo só em outra instituição recebe 403;</li>
- * <li>um usuário com vínculo na instituição dos dados, mas encerrado ou com outro perfil, recebe 403;</li>
- * <li>controle positivo: um usuário com vínculo na instituição dos dados, com a mesma requisição, não
- * recebe 401 nem 403. A única diferença entre eles é o vínculo, então o 403 vem da checagem de vínculo, e
- * não de uma requisição mal montada.</li>
- * </ul>
- * Toda requisição precisa cair no método da rota do caso (e não em outra rota parecida).
- * Cada caso usa um cenário novo, para uma rota não interferir na outra.
- */
 class VinculoEmTodaRotaTest extends TesteIntegracao {
 
 	private static final Set<String> PERFIS_DE_INSTITUICAO = Set.of("MEDICO", "ENFERMEIRO", "ADMINISTRATIVO", "RECEPCAO");
 	private static final Pattern PERFIL = Pattern.compile("'([A-Z_]+)'");
-	/**
-	 * As únicas regras de acesso que o teste sabe ler. Qualquer outra (hasAuthority, SpEL com bean,
-	 * isAuthenticated...) faz o teste falhar, em vez de a rota sumir da conferência sem aviso.
-	 */
 	private static final Pattern REGRA_RECONHECIDA = Pattern.compile("has(Any)?Role\\('[A-Z_]+'(\\s*,\\s*'[A-Z_]+')*\\)");
 
-	/** Rotas de perfil de instituição que, de propósito, não exigem vínculo, e por quê. */
 	private static final Map<String, String> SEM_VINCULO = Map.of(
 			"GET /leitos", "busca de leitos aberta à rede, para ver vagas em transferências; não traz dado de"
 					+ " paciente (BE-13)",
@@ -81,7 +59,6 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 			"GET /usuarios/eu", "dados do próprio usuário logado, inclusive os vínculos dele: é com isso que o"
 					+ " front-end sabe em que instituição ele pode operar; não traz dado de paciente (FE-02)");
 
-	/** Rotas sem @PreAuthorize: só as de autenticação, protegidas pela configuração de segurança. */
 	private static final Set<String> SEM_PREAUTHORIZE = Set.of("POST /auth/login", "POST /auth/segundo-fator/cadastro",
 			"POST /auth/segundo-fator/validacao");
 
@@ -103,13 +80,11 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 	@Autowired
 	JdbcTemplate jdbc;
 
-	/** Dados de um hospital, com tudo o que as rotas usam. */
 	private record Dados(Instituicao hospital, String cpf, UUID pacienteId, UUID atendimentoId, UUID triagemId,
 			UUID resumoId, UUID atendimentoSemTriagemId, UUID leitoId, UUID leitoLivreId, UUID internacaoId,
 			UUID representacaoId, Instituicao outraInstituicao, UUID solicitacaoEnviadaId, UUID solicitacaoRecebidaId) {
 	}
 
-	/** A requisição de cada rota, montada sobre os dados do hospital. */
 	private static Map<String, Function<Dados, MockHttpServletRequestBuilder>> casos() {
 		Map<String, Function<Dados, MockHttpServletRequestBuilder>> casos = new LinkedHashMap<>();
 		casos.put("POST /atendimentos/{atendimentoId}/registros",
@@ -184,10 +159,6 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 		return casos;
 	}
 
-	/**
-	 * Critério de aceite: uma rota nova de profissional sem caso aqui (nem justificativa em SEM_VINCULO)
-	 * faz o teste falhar. E nenhuma rota fica sem @PreAuthorize, senão qualquer perfil a acessaria.
-	 */
 	@Test
 	void todaRotaDeProfissionalTemCasoNoTeste() {
 		Map<String, Set<String>> deProfissional = rotasDeProfissional();
@@ -216,7 +187,6 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 		LocalDateTime agora = LocalDateTime.now(relogio);
 		Dados dados = montarHospital();
 		Instituicao outroHospital = cenario.instituicao(true);
-		// Perfil de instituição que a rota não aceita (se ela aceitar todos, essa variante não se aplica).
 		Optional<Perfil> outroPerfil = Arrays.stream(Perfil.values())
 				.filter(candidato -> PERFIS_DE_INSTITUICAO.contains(candidato.name()))
 				.filter(candidato -> !perfisDaRota.contains(candidato.name())).findFirst();
@@ -246,10 +216,6 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 		return resultado.getResponse().getStatus();
 	}
 
-	/**
-	 * Um hospital com paciente atendido, triagem, resumo, leitos, internação, representação legal e pedidos
-	 * de transferência de e para outra instituição.
-	 */
 	private Dados montarHospital() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
 		String administrativo = cenario.administrativo(hospital);
@@ -275,7 +241,6 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 		cenario.representante(pacienteId, LocalDateTime.now(relogio).minusDays(1), null);
 		UUID representacaoId = jdbc.queryForObject("select id from representacao_legal where paciente_id = ?", UUID.class,
 				pacienteId);
-		// Transferência entre instituições: um pedido deste hospital para outro, e um de outro para este.
 		Instituicao outra = cenario.instituicao(true);
 		String administrativoDaOutra = cenario.administrativo(outra);
 		UUID internacaoNaOutra = id(executar(administrativoDaOutra, "ADMINISTRATIVO", post("/internacoes").content(
@@ -311,10 +276,6 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 		return resultado;
 	}
 
-	/**
-	 * Toda regra de acesso das rotas da aplicação é uma que o teste sabe ler, e toda rota declara o método
-	 * HTTP. Senão a rota sumiria das conferências acima sem aviso.
-	 */
 	@Test
 	void todaRotaTemRegraDeAcessoReconhecidaEMetodoHttp() {
 		Set<String> naoReconhecidas = new TreeSet<>();
@@ -344,7 +305,6 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 		return metodos;
 	}
 
-	/** "MÉTODO /caminho" de cada rota da aplicação que aceita um perfil de instituição, com esses perfis. */
 	private Map<String, Set<String>> rotasDeProfissional() {
 		Map<String, Set<String>> rotas = new TreeMap<>();
 		mapeamento.getHandlerMethods().forEach((info, metodo) -> {

@@ -113,7 +113,6 @@ class RegistroClinicoRepositoryTest {
 				.isEqualTo(1);
 	}
 
-	/** BE-14: sem consentimento amplo, a instituição continua vendo o que ela mesma registrou. */
 	@Test
 	void semCompartilhamentoAInstituicaoVeSoOsProprioRegistros() {
 		Instituicao outra = novaInstituicao("Hospital Privado Fictício");

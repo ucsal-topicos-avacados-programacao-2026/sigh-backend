@@ -1,8 +1,5 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- now() segue o fuso da sessão, que o driver JDBC herda da JVM. Fixar o fuso da aplicação
--- (sigh.fuso-horario) faz os horários de demonstração baterem com o relógio do back-end.
--- SET LOCAL vale só para esta migração.
 SET LOCAL TIME ZONE '${fuso_horario}';
 
 INSERT INTO instituicao (id, nome, tipo, credenciada) VALUES
@@ -86,8 +83,6 @@ INSERT INTO internacao (id, prontuario_id, atendimento_origem_id, admitida_em, a
 INSERT INTO ocupacao_leito (id, leito_id, internacao_id, inicio_em, fim_em, motivo_inicio) VALUES
     ('81000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000002', '80000000-0000-0000-0000-000000000001', now() - INTERVAL '3 days' + INTERVAL '2 hours', NULL, 'INTERNACAO');
 
--- BE-27 (FE-09): um 3º hospital e mais movimento na rede, para o painel mostrar números diferentes por hospital.
--- Pacientes fictícios com CPF válido só para teste.
 INSERT INTO instituicao (id, nome, tipo, credenciada) VALUES
     ('10000000-0000-0000-0000-000000000003', 'Hospital Universitário Exemplo', 'PUBLICA', TRUE);
 
@@ -165,7 +160,6 @@ INSERT INTO atendimento (id, prontuario_id, instituicao_id, chegada_em, inicio_c
     ('50000000-0000-0000-0000-000000000116', '40000000-0000-0000-0000-000000000016', '10000000-0000-0000-0000-000000000003', now() - INTERVAL '130 minutes', NULL, 'Entorse de tornozelo', 'EM_TRIAGEM', NULL),
     ('50000000-0000-0000-0000-000000000117', '40000000-0000-0000-0000-000000000017', '10000000-0000-0000-0000-000000000003', now() - INTERVAL '22 minutes', NULL, 'Tontura e fraqueza', 'ABERTO', NULL);
 
--- Classificação já confirmada: estes estão na fila do médico. A espera conta da chegada.
 INSERT INTO triagem (id, atendimento_id, sintomas, pressao_arterial, frequencia_cardiaca, frequencia_respiratoria, temperatura, saturacao_oxigenio, cor_sugerida, cor_confirmada, confirmada_em, registrador_id, confirmador_id) VALUES
     ('b0000000-0000-0000-0000-000000000004', '50000000-0000-0000-0000-000000000104', 'Dor no peito em aperto, iniciada há uma hora', '150/95', '104', '20', '36.8', '95.0', 'LARANJA', 'LARANJA', now() - INTERVAL '18 minutes' + INTERVAL '3 minutes', '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000002'),
     ('b0000000-0000-0000-0000-000000000005', '50000000-0000-0000-0000-000000000105', 'Vômitos desde a madrugada, boca seca', '110/70', '98', '18', '37.4', '97.0', 'AMARELO', 'AMARELO', now() - INTERVAL '75 minutes' + INTERVAL '3 minutes', '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000002'),
@@ -202,12 +196,9 @@ INSERT INTO ocupacao_leito (id, leito_id, internacao_id, inicio_em, fim_em, moti
     ('81000000-0000-0000-0000-000000000012', '70000000-0000-0000-0000-000000000018', '80000000-0000-0000-0000-000000000012', now() - INTERVAL '2 days' + INTERVAL '2 hours', NULL, 'INTERNACAO'),
     ('81000000-0000-0000-0000-000000000013', '70000000-0000-0000-0000-000000000016', '80000000-0000-0000-0000-000000000013', now() - INTERVAL '3 days' + INTERVAL '1 hour', NULL, 'INTERNACAO');
 
--- Pedido de transferência do Público para o Universitário, ainda sem resposta.
 INSERT INTO solicitacao_transferencia (id, internacao_id, instituicao_origem_id, instituicao_destino_id, categoria, status, solicitada_em, solicitante_id, decidida_em, decisor_id, leito_destino_id, motivo_recusa) VALUES
     ('82000000-0000-0000-0000-000000000001', '80000000-0000-0000-0000-000000000008', '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000003', 'ENFERMARIA', 'PENDENTE', now() - INTERVAL '40 minutes', '20000000-0000-0000-0000-000000000004', NULL, NULL, NULL, NULL);
 
--- Histórico clínico fictício dos pacientes de demonstração, vindo de atendimentos anteriores nos três hospitais.
--- Ana, Bruno, Gabriela e Pedro ficam como estão: Bruno negou o consentimento, e Gabriela e Pedro são o primeiro atendimento na rede (RN-009).
 INSERT INTO registro_clinico (id, prontuario_id, atendimento_id, tipo, criado_em, conteudo, categoria_informacao, codigo_cid10, autor_id, origem_id) VALUES
     ('61000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000003', NULL, 'DIAGNOSTICO', now() - INTERVAL '1700 days', 'Doença pulmonar obstrutiva crônica.', 'Clínica geral', 'J44.9', '20000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001'),
     ('61000000-0000-0000-0000-000000000002', '40000000-0000-0000-0000-000000000003', NULL, 'PRESCRICAO', now() - INTERVAL '120 days', 'Brometo de tiotrópio 18 mcg, 1 cápsula inalada ao dia.', 'Medicamentos', NULL, '20000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001'),
@@ -272,7 +263,6 @@ INSERT INTO registro_clinico (id, prontuario_id, atendimento_id, tipo, criado_em
     ('61000000-0000-0000-0000-000000000061', '40000000-0000-0000-0000-000000000017', NULL, 'PRESCRICAO', now() - INTERVAL '130 days', 'Levotiroxina 75 mcg em jejum e anlodipino 5 mg 1x/dia.', 'Medicamentos', NULL, '20000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001'),
     ('61000000-0000-0000-0000-000000000062', '40000000-0000-0000-0000-000000000017', NULL, 'EXAME', now() - INTERVAL '80 days', 'Hemoglobina 10,8 g/dL. TSH 3,2 mUI/L.', 'Clínica geral', NULL, '20000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001'),
     ('61000000-0000-0000-0000-000000000063', '40000000-0000-0000-0000-000000000017', NULL, 'EVOLUCAO', now() - INTERVAL '90 days', 'Relata duas quedas no último ano, sem fratura. Orientadas a revisão da medicação e o uso de apoio para andar.', 'Clínica geral', NULL, '20000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001');
--- O prontuário passa a ser anterior ao histórico mais antigo de cada paciente. O consentimento não muda: as versões são imutáveis.
 UPDATE prontuario SET criado_em = now() - INTERVAL '930 days' WHERE id = '40000000-0000-0000-0000-000000000004' AND criado_em > now() - INTERVAL '930 days';
 UPDATE prontuario SET criado_em = now() - INTERVAL '830 days' WHERE id = '40000000-0000-0000-0000-000000000005' AND criado_em > now() - INTERVAL '830 days';
 UPDATE prontuario SET criado_em = now() - INTERVAL '1530 days' WHERE id = '40000000-0000-0000-0000-000000000006' AND criado_em > now() - INTERVAL '1530 days';

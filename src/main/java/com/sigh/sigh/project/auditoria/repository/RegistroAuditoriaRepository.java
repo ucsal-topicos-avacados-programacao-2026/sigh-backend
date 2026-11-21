@@ -43,11 +43,6 @@ public interface RegistroAuditoriaRepository extends JpaRepository<RegistroAudit
 			""")
 	Page<AcessoDoPacienteDTO> buscarAcessosAoProntuario(UUID pacienteId, Pageable paginacao);
 
-	/**
-	 * Registros do período para o auditor. A justificativa é cifrada com o vínculo à linha e só é decifrada
-	 * quando a entidade termina de carregar (@PostLoad), então a consulta devolve as entidades e o DTO é
-	 * montado depois, nunca dentro do select.
-	 */
 	default Page<RegistroAuditoriaResponseDTO> buscarRegistros(UUID instituicaoId, Boolean emergencia,
 			LocalDateTime inicio, LocalDateTime fim, Pageable paginacao) {
 		return buscarRegistrosDoPeriodo(instituicaoId, emergencia, inicio, fim, paginacao)
@@ -72,10 +67,6 @@ public interface RegistroAuditoriaRepository extends JpaRepository<RegistroAudit
 	Page<RegistroAuditoria> buscarRegistrosDoPeriodo(UUID instituicaoId, Boolean emergencia,
 			LocalDateTime inicio, LocalDateTime fim, Pageable paginacao);
 
-	/**
-	 * Fila obrigatória do auditor (BE-18): acessos de emergência que ainda não têm análise conclusiva,
-	 * do mais antigo para o mais novo. O DTO é montado depois da consulta (a justificativa é cifrada).
-	 */
 	default Page<RegistroAuditoriaResponseDTO> buscarEmergenciasSemAnalise(Pageable paginacao) {
 		return buscarEmergenciasPendentes(paginacao).map(RegistroAuditoriaResponseDTO::de);
 	}

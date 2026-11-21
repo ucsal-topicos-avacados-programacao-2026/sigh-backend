@@ -56,10 +56,6 @@ public class InternacaoService {
 	private final InstituicaoRepository instituicaoRepository;
 	private final UsuarioService usuarioService;
 
-	/**
-	 * Internações em andamento nos leitos da instituição (FE-04), com o que o administrativo precisa para
-	 * transferir ou dar alta. Exige vínculo administrativo ativo com a instituição antes de ler qualquer dado.
-	 */
 	@Transactional(readOnly = true)
 	public List<InternacaoAtivaDTO> internacoesAtivas(UUID instituicaoId, String login) {
 		vinculoService.exigirVinculoAtivo(login, instituicaoId, Perfil.ADMINISTRATIVO);
@@ -79,10 +75,6 @@ public class InternacaoService {
 		}).toList();
 	}
 
-	/**
-	 * Atendimentos em aberto da instituição cujo paciente não está internado (FE-04): de onde se escolhe quem
-	 * internar, e a fila de espera quando não há leito livre. Exige vínculo administrativo ativo com a instituição.
-	 */
 	@Transactional(readOnly = true)
 	public List<AtendimentoSemLeitoDTO> atendimentosSemLeito(UUID instituicaoId, String login) {
 		vinculoService.exigirVinculoAtivo(login, instituicaoId, Perfil.ADMINISTRATIVO);
@@ -113,10 +105,6 @@ public class InternacaoService {
 		return InternacaoResponseDTO.de(internacao, leito);
 	}
 
-	/**
-	 * Transferência entre leitos da mesma instituição: registro direto do administrativo dela. Para outra
-	 * instituição da rede, é por solicitação, que o destino aceita ou recusa (BE-21).
-	 */
 	@Transactional
 	public InternacaoResponseDTO transferir(UUID internacaoId, UUID leitoDestinoId, String login) {
 		Internacao internacao = buscarInternacaoAberta(internacaoId, login);
@@ -137,7 +125,6 @@ public class InternacaoService {
 		Leito leito = desocuparLeitoAtual(internacao);
 		internacao.setAltaEm(LocalDateTime.now(clock));
 		internacao.setResumoAlta(resumoAlta);
-		// Com a alta, um pedido de transferência pendente perde o sentido.
 		for (SolicitacaoTransferencia pendente : solicitacaoRepository.findByInternacaoIdAndStatus(internacao.getId(),
 				StatusSolicitacaoTransferencia.PENDENTE)) {
 			decidir(pendente, StatusSolicitacaoTransferencia.CANCELADA, login);
@@ -145,10 +132,6 @@ public class InternacaoService {
 		return InternacaoResponseDTO.de(internacao, leito);
 	}
 
-	/**
-	 * A origem pede a transferência para outra instituição da rede (Processo 2 da ERS: "solicita-se
-	 * transferência para outra unidade da rede"). O paciente continua no leito atual até o destino aceitar.
-	 */
 	@Transactional
 	public SolicitacaoTransferenciaResponseDTO solicitarTransferencia(UUID internacaoId,
 			SolicitacaoTransferenciaRequestDTO dados, String login) {
@@ -177,7 +160,6 @@ public class InternacaoService {
 		return SolicitacaoTransferenciaResponseDTO.de(solicitacaoRepository.saveAndFlush(solicitacao));
 	}
 
-	/** Pendentes para o destino, do mais antigo para o mais novo. Só o administrativo do destino as vê. */
 	@Transactional(readOnly = true)
 	public Page<SolicitacaoTransferenciaResponseDTO> solicitacoesRecebidas(UUID instituicaoId, String login,
 			Pageable paginacao) {
@@ -186,7 +168,6 @@ public class InternacaoService {
 				.map(SolicitacaoTransferenciaResponseDTO::de);
 	}
 
-	/** Pedidos feitos pela origem, com o status e o motivo da recusa. Só o administrativo da origem os vê. */
 	@Transactional(readOnly = true)
 	public Page<SolicitacaoTransferenciaResponseDTO> solicitacoesEnviadas(UUID instituicaoId, String login,
 			Pageable paginacao) {
@@ -195,10 +176,6 @@ public class InternacaoService {
 				.map(SolicitacaoTransferenciaResponseDTO::de);
 	}
 
-	/**
-	 * O destino aceita escolhendo um leito livre dele, da categoria pedida ("a unidade de destino executa
-	 * este mesmo processo"). O paciente deixa o leito da origem, que vai para higienização.
-	 */
 	@Transactional
 	public SolicitacaoTransferenciaResponseDTO aceitarTransferencia(UUID solicitacaoId, UUID leitoId, String login) {
 		SolicitacaoTransferencia solicitacao = travarPendente(solicitacaoId, login, true);
@@ -232,7 +209,6 @@ public class InternacaoService {
 		return SolicitacaoTransferenciaResponseDTO.de(solicitacao);
 	}
 
-	/** Só a origem cancela, e só enquanto estiver pendente. */
 	@Transactional
 	public SolicitacaoTransferenciaResponseDTO cancelarTransferencia(UUID solicitacaoId, String login) {
 		SolicitacaoTransferencia solicitacao = travarPendente(solicitacaoId, login, false);
@@ -240,11 +216,6 @@ public class InternacaoService {
 		return SolicitacaoTransferenciaResponseDTO.de(solicitacao);
 	}
 
-	/**
-	 * Confere o vínculo (com o destino ou com a origem) antes de travar qualquer coisa; depois trava a
-	 * internação e a solicitação, nessa ordem (a mesma da alta e da transferência direta), e confere que
-	 * ainda está pendente.
-	 */
 	private SolicitacaoTransferencia travarPendente(UUID solicitacaoId, String login, boolean peloDestino) {
 		ReferenciasDaSolicitacao referencias = solicitacaoRepository.buscarReferencias(solicitacaoId)
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Solicitação de transferência não encontrada."));
@@ -268,7 +239,6 @@ public class InternacaoService {
 		solicitacao.setDecisor(usuarioService.buscarPorLogin(login));
 	}
 
-	/** Transferência e alta exigem vínculo com a instituição onde o paciente está internado agora. */
 	private Internacao buscarInternacaoAberta(UUID internacaoId, String login) {
 		Internacao internacao = internacaoRepository.findComBloqueioById(internacaoId)
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Internação não encontrada."));
@@ -279,7 +249,6 @@ public class InternacaoService {
 		return internacao;
 	}
 
-	/** Instituição onde o paciente está internado agora: a do leito ocupado (ou a do atendimento de origem). */
 	private UUID instituicaoAtual(Internacao internacao) {
 		return ocupacaoLeitoRepository.instituicaoDaOcupacaoAtual(internacao.getId())
 				.orElseGet(() -> internacao.getAtendimentoOrigem().getInstituicao().getId());

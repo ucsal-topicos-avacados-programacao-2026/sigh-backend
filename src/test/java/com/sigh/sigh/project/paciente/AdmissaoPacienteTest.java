@@ -100,7 +100,6 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 		});
 	}
 
-	/** Critério de aceite: o segundo cadastro do mesmo CPF em outra instituição reaproveita o prontuário. */
 	@Test
 	void mesmoCpfEmOutraInstituicaoReaproveitaOProntuario() throws Exception {
 		Instituicao hospitalA = cenario.instituicao(true);
@@ -112,7 +111,6 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 		MvcResult primeiro = mvc.perform(admissao(adminA, novoCadastro(cpf, hospitalA.getId(), "AUTORIZADO")))
 				.andExpect(status().isCreated()).andReturn();
 
-		// Segunda instituição informa o CPF com máscara e outros dados: nada disso pode duplicar ou sobrescrever.
 		String segundaAdmissao = """
 				{"cpf":"%s","nome":"Outro Nome","dataNascimento":"1999-01-01","consentimentoInicial":"NEGADO",
 				 "instituicaoId":"%s","motivo":"Retorno"}
@@ -132,7 +130,6 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 		assertThat(paciente.getDataNascimento()).isEqualTo(LocalDate.of(1980, 5, 17));
 		assertThat(pacienteRepository.findAll().stream().filter(p -> p.getCpf().equals(cpf))).hasSize(1);
 
-		// O consentimento só é registrado no primeiro cadastro; a recepção não o altera depois.
 		List<Consentimento> consentimentos = consentimentoRepository.historico(pacienteId);
 		assertThat(consentimentos).extracting(Consentimento::getDecisao)
 				.containsExactly(DecisaoConsentimento.AUTORIZADO);
@@ -224,10 +221,6 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 				.andExpect(jsonPath("$.campos.motivo").exists());
 	}
 
-	/**
-	 * BE-12: "no futuro" é decidido pelo relógio da aplicação. Às 22h de 10/11 na Bahia já é 11/11 em
-	 * UTC (fuso da JVM dos testes), mas nascer em 11/11 ainda é no futuro.
-	 */
 	@Test
 	void dataDeNascimentoNoFuturoUsaOFusoDaAplicacao() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
@@ -365,10 +358,6 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 				.andExpect(jsonPath("$.nome").doesNotExist());
 	}
 
-	/**
-	 * Recepções cadastrando o mesmo CPF ao mesmo tempo: nunca há dois cadastros, e todas as
-	 * admissões terminam vinculadas ao mesmo prontuário (RN-004).
-	 */
 	@Test
 	void cadastrosSimultaneosDoMesmoCpfNaoDuplicamEVinculamAoMesmoProntuario() throws Exception {
 		Instituicao hospitalA = cenario.instituicao(true);

@@ -10,16 +10,11 @@ import java.util.UUID;
 
 public interface AtendimentoRepository extends JpaRepository<Atendimento, UUID> {
 
-	/** Indica se a instituição já atendeu o paciente até o instante informado (RN-007). */
 	boolean existsByProntuarioPacienteIdAndInstituicaoId(UUID pacienteId, UUID instituicaoId);
 
 	boolean existsByProntuarioPacienteIdAndInstituicaoIdAndChegadaEmLessThanEqual(
 			UUID pacienteId, UUID instituicaoId, LocalDateTime ate);
 
-	/**
-	 * Atendimentos em aberto da instituição cujo paciente não está internado: de onde o administrativo escolhe
-	 * quem internar, e a fila de espera quando não há leito livre (FE-04). Do mais antigo para o mais recente.
-	 */
 	@Query("""
 			select a from Atendimento a
 			join fetch a.prontuario p
@@ -31,7 +26,6 @@ public interface AtendimentoRepository extends JpaRepository<Atendimento, UUID> 
 			""")
 	List<Atendimento> abertosSemInternacao(UUID instituicaoId);
 
-	/** Atendimentos em andamento com o médico na instituição, do que começou antes para o mais recente (FE-07). */
 	@Query("""
 			select a from Atendimento a
 			join fetch a.prontuario p

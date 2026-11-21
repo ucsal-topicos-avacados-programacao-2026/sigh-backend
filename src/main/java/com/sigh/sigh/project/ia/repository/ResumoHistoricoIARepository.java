@@ -10,7 +10,6 @@ import java.util.UUID;
 
 public interface ResumoHistoricoIARepository extends JpaRepository<ResumoHistoricoIA, UUID> {
 
-	/** Resumos que estavam na fila da memória quando a aplicação parou: não serão mais gerados. */
 	@Modifying
 	@Transactional
 	@Query("""

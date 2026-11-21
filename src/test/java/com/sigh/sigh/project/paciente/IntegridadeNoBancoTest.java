@@ -25,10 +25,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * BE-17: as regras de consentimento, restrição e representação valem no banco (V4), inclusive para
- * gravações que não passam pelos serviços ou que chegam ao mesmo tempo.
- */
 class IntegridadeNoBancoTest extends TesteIntegracao {
 
 	private static final Timestamp AGORA = Timestamp.valueOf(LocalDateTime.of(2026, 11, 10, 12, 0));

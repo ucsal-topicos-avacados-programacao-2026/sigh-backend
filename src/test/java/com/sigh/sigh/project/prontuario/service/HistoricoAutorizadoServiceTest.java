@@ -68,10 +68,6 @@ class HistoricoAutorizadoServiceTest {
 		atendimento.setInstituicao(instituicao);
 	}
 
-	/**
-	 * NEGADO, sem manifestação, revogado sem atendimento anterior na instituição ou instituição não
-	 * credenciada: a consulta fica limitada aos registros da própria instituição (BE-14).
-	 */
 	@Test
 	void consentimentoQueNaoPermiteCompartilharLimitaAosRegistrosDaPropriaInstituicaoSemGerarAcessoVazio() {
 		compartilhamentoPermitido(false);
@@ -105,7 +101,6 @@ class HistoricoAutorizadoServiceTest {
 		assertThat(acesso.getValue().emergencia()).isFalse();
 	}
 
-	/** RN-003: a justificativa vai para a auditoria mesmo quando o prontuário está vazio. */
 	@Test
 	void acessoDeEmergenciaRegistraAJustificativaETrazOProntuarioInteiro() {
 		RegistroClinico restrito = new RegistroClinico();

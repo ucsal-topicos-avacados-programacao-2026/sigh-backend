@@ -34,10 +34,6 @@ import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Rotas do paciente ou do representante legal vigente sobre os dados do paciente: histórico (U1),
- * consentimento amplo (RF-002), restrições e autorizações adicionais (RF-009).
- */
 @RestController
 @RequestMapping("/api/pacientes")
 @PreAuthorize("hasRole('PACIENTE')")
@@ -51,7 +47,6 @@ public class DadosDoPacienteController {
 	private final AutorizacaoAdicionalService autorizacaoAdicionalService;
 	private final ConsultaAuditoriaService consultaAuditoriaService;
 
-	/** Pacientes que o usuário gerencia: o próprio cadastro e os representados. */
 	@GetMapping("/gerenciados")
 	public List<PacienteGerenciadoResponse> gerenciados(Principal usuario) {
 		return titularidadeService.gerenciados(usuario.getName());
@@ -62,7 +57,6 @@ public class DadosDoPacienteController {
 		return historicoDoPacienteService.consultar(pacienteId, usuario.getName());
 	}
 
-	/** Quem acessou o prontuário (RF-008), também para o representante legal (BE-19). */
 	@GetMapping("/{pacienteId}/acessos")
 	public PagedModel<AcessoDoPacienteDTO> acessos(@PathVariable UUID pacienteId, Pageable paginacao, Principal usuario) {
 		return new PagedModel<>(consultaAuditoriaService.consultarAcessosDoPaciente(pacienteId, usuario.getName(), paginacao));

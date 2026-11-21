@@ -21,7 +21,6 @@ public class PainelController {
 
 	private final PainelService painelService;
 
-	/** Números da instituição agora: leitos, fila por cor de risco, espera, internados e transferências (FE-09). */
 	@GetMapping
 	@PreAuthorize("hasAnyRole('MEDICO', 'ENFERMEIRO', 'ADMINISTRATIVO', 'AUDITOR_GESTOR')")
 	public PainelDaInstituicaoDTO daInstituicao(@RequestParam UUID instituicaoId, Authentication usuario) {

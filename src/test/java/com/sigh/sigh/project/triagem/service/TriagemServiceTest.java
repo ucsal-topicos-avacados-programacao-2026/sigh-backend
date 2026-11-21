@@ -88,7 +88,6 @@ class TriagemServiceTest {
 		verify(triagemRepository, never()).save(any());
 	}
 
-	/** BE-24: o paciente com o médico pode ser reclassificado, sem voltar para a fila de triagem. */
 	@Test
 	void atendimentoJaComOMedicoAceitaReclassificacaoSemVoltarParaAFila() {
 		Atendimento atendimento = novoAtendimento(StatusAtendimento.EM_ATENDIMENTO);
@@ -129,7 +128,6 @@ class TriagemServiceTest {
 		assertThat(triagem.getCorConfirmada()).isEqualTo(CorRisco.VERDE);
 	}
 
-	/** BE-24: "até o atendimento ser encerrado" vale também para a confirmação de uma triagem pendente. */
 	@Test
 	void naoConfirmaClassificacaoDeAtendimentoEncerrado() {
 		Triagem triagem = novaTriagem();

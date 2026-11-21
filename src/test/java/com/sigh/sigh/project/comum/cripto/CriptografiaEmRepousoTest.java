@@ -53,11 +53,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Critérios de aceite do BE-09 e do BE-22 (RNF-004): o dado clínico não aparece em texto claro no
- * banco (e, por isso, nem nas cópias); a aplicação continua lendo o texto claro; valor copiado de outra
- * linha não é decifrado; valor em claro gravado direto no banco é detectado e recusado.
- */
 @ExtendWith(OutputCaptureExtension.class)
 class CriptografiaEmRepousoTest extends TesteIntegracao {
 
@@ -65,7 +60,6 @@ class CriptografiaEmRepousoTest extends TesteIntegracao {
 			{"atendimentoId":"%s","sintomas":"Dor torácica irradiada","sinaisVitais":{"pressaoArterial":"150/95",
 			 "frequenciaCardiaca":112,"frequenciaRespiratoria":24,"temperatura":37.8,"saturacaoOxigenio":93.5}}
 			""";
-	/** Chave dos testes (src/test/resources/config) e a anterior, de id 0. */
 	private static final byte[] CHAVE_ATUAL = Base64.getDecoder().decode("dGVzdGUtc29tZW50ZS1jaGF2ZS0zMi1ieXRlcy0hISE=");
 	private static final String CHAVE_ANTERIOR = "Y2hhdmUtYW50ZXJpb3ItZmljdGljaWEtMzJieXRlcyE=";
 
@@ -113,16 +107,13 @@ class CriptografiaEmRepousoTest extends TesteIntegracao {
 				.andExpect(jsonPath("$.sinaisVitais.temperatura").value(37.8))
 				.andReturn().getResponse().getContentAsString();
 		UUID triagemId = UUID.fromString(JsonPath.read(triagem, "$.id"));
-		// Classificação vermelha: o acesso de emergência mais abaixo só vale com risco imediato (BE-18).
 		mvc.perform(post("/triagens/{id}/confirmacao", triagemId).with(user(enfermeiro).roles("ENFERMEIRO")).with(csrf())
 						.contentType(MediaType.APPLICATION_JSON).content("{\"cor\":\"VERMELHO\"}"))
 				.andExpect(status().isOk());
-		// O médico registra depois da triagem: com o atendimento em curso, não se tria mais.
 		mvc.perform(post("/atendimentos/{id}/registros", atendimentoId).with(user(medico).roles("MEDICO")).with(csrf())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("{\"tipo\":\"DIAGNOSTICO\",\"conteudo\":\"Infarto agudo do miocárdio\",\"categoriaInformacao\":\"Cardiologia\",\"codigoCID10\":\"I21.9\"}"))
 				.andExpect(status().isCreated());
-		// O resumo é gravado pendente e o texto entra depois: cobre o caminho do UPDATE.
 		UUID resumoId = resumoHistoricoService.solicitar(atendimentoId, medico).resumoId();
 		resumoHistoricoService.concluir(resumoId, "Infarto agudo do miocárdio recente.");
 		mvc.perform(post("/atendimentos/{id}/historico/emergencia", atendimentoId).with(user(medico).roles("MEDICO"))
@@ -152,12 +143,10 @@ class CriptografiaEmRepousoTest extends TesteIntegracao {
 				triagemId, triagemId, resumoId, pacienteId);
 
 		assertThat(gravados).hasSize(11).allSatisfy(valor -> assertThat(valor).startsWith("sigh:v2:1:"));
-		// Só trechos que não podem surgir por acaso no Base64 (acento, ponto, espaço ou palavra longa).
 		assertThat(String.join(" ", gravados)).doesNotContain("Infarto", "I21.9", "torácica", "150/95", "37.8", "93.5",
 				"Parada", "Febre alta");
 	}
 
-	/** Critério de aceite do BE-22: valor copiado de outra linha não é decifrado. */
 	@Test
 	void valorCifradoCopiadoDeOutraLinhaNaoEhDecifrado(CapturedOutput saida) throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
@@ -183,10 +172,6 @@ class CriptografiaEmRepousoTest extends TesteIntegracao {
 				.andExpect(jsonPath("$[*].conteudo").value(hasItem("Resfriado comum")));
 	}
 
-	/**
-	 * Critério de aceite do BE-22: valor em claro gravado direto no banco, depois da migração, é detectado
-	 * (log ao subir e na leitura), não é cifrado nem aceito como dado.
-	 */
 	@Test
 	void valorEmClaroGravadoDiretoNoBancoEhDetectadoERecusado(CapturedOutput saida) throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
@@ -223,10 +208,6 @@ class CriptografiaEmRepousoTest extends TesteIntegracao {
 				.andExpect(jsonPath("$[*].conteudo").value(hasItem("Lombalgia")));
 	}
 
-	/**
-	 * Valor que passa de nulo para preenchido sem nenhum outro campo mudar (o cadastro do segundo fator):
-	 * precisa chegar ao banco cifrado. Sem transação no teste, como na aplicação: cada chamada relê do banco.
-	 */
 	@Test
 	void valorQuePassaDeNuloParaPreenchidoSozinhoEhGravadoCifrado() {
 		String login = cenario.usuario(Perfil.MEDICO).getLogin();
@@ -241,10 +222,6 @@ class CriptografiaEmRepousoTest extends TesteIntegracao {
 		assertThat(usuarioRepository.findByLogin(login).orElseThrow().getMfaSegredo()).isEqualTo(segredo);
 	}
 
-	/**
-	 * Auditoria: só as linhas listadas na migração continuam lendo o legado. Uma auditoria inserida
-	 * depois, fora da aplicação, com justificativa em claro, é detectada e recusada.
-	 */
 	@Test
 	void auditoriaForjadaComJustificativaEmClaroEhRecusadaEALegadaContinuaLegivel(CapturedOutput saida) throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
@@ -289,7 +266,6 @@ class CriptografiaEmRepousoTest extends TesteIntegracao {
 		assertThat(manutencao.executar().foraDoFormato()).isZero();
 	}
 
-	/** Roda com os gatilhos desligados (só o teste faz isso, como superusuário) para montar e limpar o cenário. */
 	private void semGatilhos(ConnectionCallback<Integer> acao) {
 		jdbc.execute((ConnectionCallback<Integer>) conexao -> {
 			conexao.createStatement().execute("set session_replication_role = replica");
@@ -301,11 +277,6 @@ class CriptografiaEmRepousoTest extends TesteIntegracao {
 		});
 	}
 
-	/**
-	 * Primeira execução depois desta versão: o que estava em claro (anterior à criptografia) ou no
-	 * formato sem vínculo (BE-09) é cifrado no formato atual, e a versão antiga da linha some também dos
-	 * arquivos do banco (VACUUM FULL), que é o que o backup físico copia.
-	 */
 	@Test
 	void primeiraExecucaoCifraOLegadoESomeComAVersaoAntigaDaLinha() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
@@ -316,8 +287,6 @@ class CriptografiaEmRepousoTest extends TesteIntegracao {
 		String marcador = "AsmaLegadaEmClaro" + UUID.randomUUID().toString().substring(0, 8);
 		jdbc.update("update registro_clinico set conteudo = ?, codigo_cid10 = 'J45' where id = ?", marcador, registro);
 		jdbc.update("update atendimento set motivo = ? where id = ?", formatoAntigo("Crise asmática"), atendimentoId);
-		// As estatísticas (o autovacuum também faz isso) guardam amostras dos valores da coluna. Com o alvo
-		// alto, a amostra inclui todas as linhas da tabela, e o controle abaixo não depende do acaso.
 		jdbc.execute("alter table registro_clinico alter column conteudo set statistics 10000");
 		jdbc.execute("analyze registro_clinico");
 		assertThat(jdbc.queryForObject("select count(*) from pg_stats where tablename = 'registro_clinico'"
@@ -352,10 +321,6 @@ class CriptografiaEmRepousoTest extends TesteIntegracao {
 				.andExpect(jsonPath("$[0].codigoCID10").value("J45"));
 	}
 
-	/**
-	 * Depois de trocar a chave, os valores da chave anterior são regravados com a atual, e o valor antigo
-	 * some dos arquivos do banco; a chave anterior pode então sair do ambiente.
-	 */
 	@Test
 	void trocaDeChaveRegravaComAChaveAtual() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
@@ -378,10 +343,6 @@ class CriptografiaEmRepousoTest extends TesteIntegracao {
 				.andExpect(jsonPath("$[*].conteudo").value(hasItem("Gastrite crônica")));
 	}
 
-	/**
-	 * Se a aplicação cair depois de regravar e antes do VACUUM FULL, a tabela fica na fila e o VACUUM é
-	 * feito na próxima inicialização. Um nome que não é de tabela cifrada nunca chega ao comando.
-	 */
 	@Test
 	void vacuumQueFicouPendenteEhFeitoNaProximaInicializacao() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
@@ -402,7 +363,6 @@ class CriptografiaEmRepousoTest extends TesteIntegracao {
 		assertThat(jdbc.queryForObject("select to_regclass('controle_cifragem') is not null", Boolean.class)).isTrue();
 	}
 
-	/** Com outra sessão segurando um retrato antigo, o VACUUM FULL não limparia: fica na fila para depois. */
 	@Test
 	void vacuumEsperaASessaoQueSeguraUmRetratoAntigo(CapturedOutput saida) throws Exception {
 		jdbc.update("insert into cifragem_vacuum_pendente (tabela) values ('atendimento') on conflict do nothing");
@@ -425,11 +385,6 @@ class CriptografiaEmRepousoTest extends TesteIntegracao {
 		assertThat(saudeDaCifragem.health().getStatus()).isEqualTo(Status.UP);
 	}
 
-	/**
-	 * Com a aplicação conectada como dona das tabelas, mas sem ser superusuária (como recomendado), o
-	 * VACUUM das estatísticas seria pulado em silêncio: a tabela fica na fila até o papel pg_maintain ser
-	 * concedido.
-	 */
 	@Test
 	void semPermissaoNasEstatisticasOVacuumFicaNaFila(CapturedOutput saida) {
 		String papel = "sigh_app_teste";
@@ -462,10 +417,6 @@ class CriptografiaEmRepousoTest extends TesteIntegracao {
 		}
 	}
 
-	/**
-	 * As colunas cifradas, lidas das entidades (as mesmas que o listener e a manutenção usam), são as
-	 * esperadas e existem no banco como texto, com espaço para o valor cifrado. Um campo clínico novo precisa entrar aqui de propósito.
-	 */
 	@Test
 	void colunasCifradasSaoAsEsperadasEExistemNoBanco() {
 		Set<String> cifradas = CamposCifrados.daAplicacao().stream().map(CamposCifrados.Campo::nome)
@@ -477,7 +428,6 @@ class CriptografiaEmRepousoTest extends TesteIntegracao {
 				"triagem.pressao_arterial", "triagem.saturacao_oxigenio", "triagem.sintomas", "triagem.temperatura",
 				"usuario.mfa_segredo");
 		for (CamposCifrados.Campo campo : CamposCifrados.daAplicacao()) {
-			// Texto sem limite, ou com folga para o valor cifrado (a semente do TOTP cifrada tem ~90 caracteres).
 			assertThat(jdbc.queryForObject("select coalesce(character_maximum_length, 1000000) from information_schema.columns"
 					+ " where table_name = ? and column_name = ? and data_type in ('text', 'character varying')", Integer.class,
 					campo.tabela(), campo.coluna())).as(campo.nome()).isGreaterThanOrEqualTo(255);
@@ -510,7 +460,6 @@ class CriptografiaEmRepousoTest extends TesteIntegracao {
 		return busca.getExitCode() == 0;
 	}
 
-	/** Valor como o BE-09 gravava (sigh:v1, sem vínculo à linha), com a chave atual dos testes. */
 	private static String formatoAntigo(String texto) throws Exception {
 		byte[] iv = new byte[12];
 		Cipher aes = Cipher.getInstance("AES/GCM/NoPadding");

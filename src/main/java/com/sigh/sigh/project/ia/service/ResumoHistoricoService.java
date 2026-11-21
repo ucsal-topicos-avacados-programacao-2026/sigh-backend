@@ -69,10 +69,6 @@ public class ResumoHistoricoService {
 		return new CasoResumoDTO(resumo.getId(), DescricaoHistorico.descrever(historico));
 	}
 
-	/**
-	 * Grava o texto só se o resumo ainda estiver em geração. Se ele já foi dado como falho (a subida de outra
-	 * instância, por exemplo), o texto é descartado, para não ressuscitar um resumo que o médico já viu falhar.
-	 */
 	@Transactional
 	public void concluir(UUID resumoId, String texto) {
 		ResumoHistoricoIA resumo = buscar(resumoId);
@@ -85,13 +81,11 @@ public class ResumoHistoricoService {
 		resumo.setStatus(StatusResumo.GERADO);
 	}
 
-	/** A resposta do pedido: sempre sem texto, mesmo que a geração já tenha terminado, para o texto só sair na consulta. */
 	@Transactional(readOnly = true)
 	public ResumoHistoricoResponseDTO emGeracao(UUID resumoId) {
 		return ResumoHistoricoResponseDTO.emGeracao(buscar(resumoId));
 	}
 
-	/** Se o solicitante ainda tem vínculo e as fontes ainda são visíveis: conferido antes de mandar à IA. */
 	@Transactional(readOnly = true)
 	public boolean continuaAutorizado(UUID resumoId) {
 		ResumoHistoricoIA resumo = buscar(resumoId);
@@ -125,27 +119,20 @@ public class ResumoHistoricoService {
 
 	@Transactional
 	public ResumoHistoricoResponseDTO consultar(UUID resumoId, String loginMedico) {
-		// A fila é consultada ANTES de ler o resumo. A tarefa grava o resultado e só depois sai da fila; então, se ele
-		// já está fora da fila aqui, a leitura abaixo já vê o que a tarefa gravou. Na ordem inversa, a leitura podia
-		// pegar o resumo ainda em geração e esta consulta o marcaria como falho, apagando o texto recém-gravado.
 		boolean naFila = filaDeResumos.pendente(resumoId);
 		ResumoHistoricoIA resumo = buscarComVinculo(resumoId, loginMedico);
 		if (resumo.getStatus() == StatusResumo.SOLICITADO && !naFila) {
-			// Em geração, mas fora da fila: a tarefa terminou sem gravar o resultado. Não vai mais ser gerado.
 			resumo.setStatus(StatusResumo.FALHOU);
 		}
 		if (!fontesContinuamVisiveis(resumo)) {
 			return ResumoHistoricoResponseDTO.oculto(resumo);
 		}
-		// Em geração ou falho, não há texto: a consulta não mostra dado clínico e não entra na auditoria.
-		// Assim, o médico pode consultar de novo até o resumo ficar pronto sem encher a auditoria.
 		if (resumo.getStatus() == StatusResumo.GERADO || resumo.getStatus() == StatusResumo.VALIDADO) {
 			registrarConsulta(resumo, loginMedico);
 		}
 		return ResumoHistoricoResponseDTO.de(resumo);
 	}
 
-	/** O resumo traz dados clínicos: só o médico com vínculo na instituição do atendimento o vê. */
 	private ResumoHistoricoIA buscarComVinculo(UUID resumoId, String loginMedico) {
 		ResumoHistoricoIA resumo = buscar(resumoId);
 		vinculoService.exigirVinculoAtivo(loginMedico, resumo.getAtendimento().getInstituicao().getId(), Perfil.MEDICO);

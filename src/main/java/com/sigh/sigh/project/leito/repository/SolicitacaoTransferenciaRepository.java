@@ -16,14 +16,9 @@ import java.util.UUID;
 
 public interface SolicitacaoTransferenciaRepository extends JpaRepository<SolicitacaoTransferencia, UUID> {
 
-	/** Com bloqueio: aceite, recusa e cancelamento simultâneos não decidem a mesma solicitação duas vezes. */
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	Optional<SolicitacaoTransferencia> findComBloqueioById(UUID id);
 
-	/**
-	 * Os ids da solicitação, sem carregá-la: se ela fosse carregada antes de travada, a trava devolveria
-	 * a mesma instância, com o status lido antes, sem reler do banco.
-	 */
 	@Query("""
 			select new com.sigh.sigh.project.leito.dto.ReferenciasDaSolicitacao(
 				s.internacao.id, s.instituicaoOrigem.id, s.instituicaoDestino.id)
@@ -33,7 +28,6 @@ public interface SolicitacaoTransferenciaRepository extends JpaRepository<Solici
 
 	List<SolicitacaoTransferencia> findByInternacaoIdAndStatus(UUID internacaoId, StatusSolicitacaoTransferencia status);
 
-	/** Pedidos feitos pela origem, de todos os status, do mais novo para o mais antigo. */
 	@Query(value = """
 			select s from SolicitacaoTransferencia s
 			join fetch s.instituicaoOrigem

@@ -32,16 +32,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * RNF-004 no perfil tls (BE-09 e BE-22):
- * <ul>
- * <li>o back-end só fala HTTPS, com TLS 1.2 ou 1.3, e manda o navegador usar sempre HTTPS (HSTS);</li>
- * <li>o banco só aceita conexão com TLS, e o back-end só conecta a ele com TLS e com o certificado do
- * servidor conferido (sslmode=verify-full).</li>
- * </ul>
- * Os certificados são fictícios, gerados na hora e entregues em PEM, como em produção. O banco é a
- * imagem do SIGH subindo com {@code iniciar-banco.sh}.
- */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("tls")
 class TlsTest {
@@ -78,7 +68,6 @@ class TlsTest {
 		propriedades.add("spring.datasource.url", () -> BancoDoSigh.urlComTls(banco, certificadoDoBanco));
 		propriedades.add("spring.datasource.username", () -> BancoDoSigh.USUARIO);
 		propriedades.add("spring.datasource.password", () -> BancoDoSigh.SENHA);
-		// Fixa a IA na própria máquina: um SIGH_IA_URL remoto no ambiente de quem roda os testes derrubaria a classe.
 		propriedades.add("sigh.ia.url", () -> "http://localhost:11434");
 	}
 
@@ -101,13 +90,11 @@ class TlsTest {
 
 	@Test
 	void naoAceitaHttpEmClaroEAceitaTls12ParaClientesMaisAntigos() throws Exception {
-		// HTTP em claro na porta TLS: o Tomcat recusa antes da aplicação ("requires TLS"), sem dado nenhum.
 		HttpResponse<String> emClaro = HttpClient.newHttpClient().send(
 				HttpRequest.newBuilder(URI.create("http://localhost:" + porta + "/leitos")).GET().build(),
 				HttpResponse.BodyHandlers.ofString());
 		assertThat(emClaro.statusCode()).isEqualTo(400);
 
-		// TLS 1.1 ou anterior nem é testado aqui: o próprio JDK cliente já o recusa, o teste não provaria nada.
 		try (SSLSocket socket = (SSLSocket) certificadoDoBackEnd.contextoQueConfia().getSocketFactory()
 				.createSocket("localhost", porta)) {
 			socket.setEnabledProtocols(new String[] {"TLSv1.2"});
@@ -116,7 +103,6 @@ class TlsTest {
 		}
 	}
 
-	/** A aplicação subiu (Flyway e JPA rodaram) e a sessão dela com o banco está cifrada. */
 	@Test
 	void aplicacaoFalaComOBancoSoPorTls() {
 		Map<String, Object> sessao = jdbc.queryForMap("select ssl, version from pg_stat_ssl where pid = pg_backend_pid()");
@@ -126,7 +112,6 @@ class TlsTest {
 		assertThat(jdbc.queryForObject("select count(*) from flyway_schema_history where success", Integer.class)).isPositive();
 	}
 
-	/** Critério de aceite do BE-22: conexão sem TLS com o banco é recusada (pelo próprio banco). */
 	@Test
 	void bancoRecusaConexaoSemTls() {
 		assertThatThrownBy(() -> DriverManager.getConnection(BancoDoSigh.urlSemSslmode(banco) + "?sslmode=disable",
@@ -135,7 +120,6 @@ class TlsTest {
 				.hasMessageContaining("no encryption");
 	}
 
-	/** verify-full confere o certificado: um banco com certificado em que o cliente não confia é recusado. */
 	@Test
 	void certificadoDoBancoQueNaoEhOEsperadoEhRecusado() throws Exception {
 		CertificadoDeTeste outro = CertificadoDeTeste.gerar("dns:localhost", "ip:127.0.0.1");
@@ -145,7 +129,6 @@ class TlsTest {
 				.hasMessageContaining("SSL");
 	}
 
-	/** No perfil tls, a aplicação não sobe com uma URL que não confere o certificado do banco. */
 	@Test
 	void semVerifyFullAAplicacaoNaoSobe() throws Exception {
 		ConexaoSeguraComOBanco exigindo = new ConexaoSeguraComOBanco(new MockEnvironment().withProperty("sigh.banco.exigir-tls", "true"));
@@ -176,10 +159,6 @@ class TlsTest {
 		}
 	}
 
-	/**
-	 * A aplicação de verdade, no perfil tls e com uma URL sem verify-full, não sobe, e para antes de o
-	 * Flyway tocar no banco.
-	 */
 	@Test
 	void aplicacaoNoPerfilTlsNaoSobeSemVerifyFullENemMigraOBanco() throws Exception {
 		jdbc.execute("create database sigh_intocado");
@@ -204,16 +183,11 @@ class TlsTest {
 		}
 	}
 
-	/**
-	 * O serviço de IA é ponto de decifragem (RNF-004): no perfil tls, a aplicação de verdade não sobe com a IA
-	 * num host que não foi autorizado, nem com ela fora da máquina sem HTTPS.
-	 */
 	@Test
 	void aplicacaoNoPerfilTlsNaoSobeComIAForaDosDestinosAutorizados() {
 		for (String[] caso : new String[][] {
 				{"https://ia.externa.example", "", "não está em sigh.ia.hosts-autorizados"},
 				{"http://ia.rede.example", "ia.rede.example", "sigh.ia.url precisa usar HTTPS"}}) {
-			// Pela linha de comando, para valer acima do DB_URL e do SIGH_IA_* do ambiente de quem roda os testes.
 			assertThatThrownBy(() -> new SpringApplicationBuilder(SighProjectApplication.class).profiles("tls")
 					.run("--spring.datasource.url=" + BancoDoSigh.urlComTls(banco, certificadoDoBanco),
 							"--spring.datasource.username=" + BancoDoSigh.USUARIO,

@@ -39,15 +39,10 @@ public class FilaAtendimentoService {
 				.map(triagem -> paraPacienteNaFila(triagem, agora));
 	}
 
-	/**
-	 * Quem aguarda triagem na instituição (FE-06): atendimentos sem classificação confirmada, por ordem de chegada,
-	 * com a triagem começada e não confirmada, se houver. Exige vínculo de enfermeiro com a instituição.
-	 */
 	@Transactional(readOnly = true)
 	public List<AguardandoTriagemDTO> aguardandoTriagem(UUID instituicaoId, String login) {
 		vinculoService.exigirVinculoAtivo(login, instituicaoId, Perfil.ENFERMEIRO);
 		return triagemRepository.aguardandoTriagem(instituicaoId).stream().map(atendimento -> {
-			// Sem hora de registro na triagem: entre duas pendentes, vale a que já tem sugestão da IA.
 			AguardandoTriagemDTO.TriagemPendente pendente = triagemRepository
 					.findByAtendimentoIdAndCorConfirmadaIsNull(atendimento.getId()).stream()
 					.min(Comparator.comparing((Triagem t) -> t.getCorSugerida() == null).thenComparing(Triagem::getId))

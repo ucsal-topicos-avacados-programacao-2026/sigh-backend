@@ -33,11 +33,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * BE-21 (RF-006): pela ERS (Processo 2 - Gestão de Leitos), a transferência para outra unidade da rede
- * é solicitada pela origem, e a unidade de destino executa o próprio processo: o administrativo do
- * destino aceita escolhendo um leito livre dele, ou recusa. A origem não ocupa leito de outra instituição.
- */
 class TransferenciaEntreInstituicoesTest extends TesteIntegracao {
 
 	@Autowired
@@ -95,7 +90,6 @@ class TransferenciaEntreInstituicoesTest extends TesteIntegracao {
 
 		aceitar(administrativoB, solicitacao, enfermariaB).andExpect(status().isUnprocessableContent())
 				.andExpect(jsonPath("$.detail").value(containsString("categoria")));
-		// Leito livre e da categoria pedida, mas da origem: o destino só aceita com leito dele.
 		UUID utiLivreEmA = leito(administrativoA, hospitalA, "UTI");
 		aceitar(administrativoB, solicitacao, utiLivreEmA).andExpect(status().isUnprocessableContent())
 				.andExpect(jsonPath("$.detail").value(containsString("instituição de destino")));
@@ -111,7 +105,6 @@ class TransferenciaEntreInstituicoesTest extends TesteIntegracao {
 		assertThat(statusDoLeito(leitoA)).as("o leito da origem vai para higienização").isEqualTo("EM_HIGIENIZACAO");
 		como(administrativoB, get("/solicitacoes-transferencia/recebidas").param("instituicaoId", hospitalB.getId().toString()))
 				.andExpect(jsonPath("$.content[*].id").value(not(hasItem(solicitacao.toString()))));
-		// Agora o paciente está em B: quem responde pela internação é o administrativo de B.
 		como(administrativoA, post("/internacoes/{id}/transferencia", internacaoId)
 						.content("{\"leitoDestinoId\":\"%s\"}".formatted(enfermariaB)))
 				.andExpect(status().isForbidden());
@@ -139,7 +132,6 @@ class TransferenciaEntreInstituicoesTest extends TesteIntegracao {
 		assertThat(statusDoLeito(leitoA)).isEqualTo("OCUPADO");
 		assertThat(statusDoLeito(utiB)).isEqualTo("LIVRE");
 		aceitar(administrativoB, solicitacao, utiB).andExpect(status().isUnprocessableContent());
-		// A origem fica sabendo da recusa e do motivo; o destino não vê os pedidos que a origem fez.
 		como(administrativoA, get("/solicitacoes-transferencia/enviadas").param("instituicaoId", hospitalA.getId().toString()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.content[?(@.id == '" + solicitacao + "')].status").value(hasItem("RECUSADA")))
@@ -195,10 +187,6 @@ class TransferenciaEntreInstituicoesTest extends TesteIntegracao {
 		assertThat(statusDoLeito(leitoA)).isEqualTo("OCUPADO");
 	}
 
-	/**
-	 * Origem e destino agindo ao mesmo tempo sobre a mesma internação: a trava da internação os põe em
-	 * fila, e o paciente nunca fica com dois leitos, nem com leito ocupado depois da alta.
-	 */
 	@Test
 	void aceiteAoMesmoTempoQueATransferenciaDiretaOuQueAAltaNaoCorrompeOsLeitos() throws Exception {
 		for (int rodada = 0; rodada < 5; rodada++) {
@@ -228,7 +216,6 @@ class TransferenciaEntreInstituicoesTest extends TesteIntegracao {
 		}
 	}
 
-	/** Com a alta na origem, o pedido pendente é cancelado e o destino não pode mais aceitá-lo. */
 	@Test
 	void altaCancelaOPedidoPendente() throws Exception {
 		UUID solicitacao = solicitar("UTI");
@@ -251,7 +238,6 @@ class TransferenciaEntreInstituicoesTest extends TesteIntegracao {
 		ResultActions executar() throws Exception;
 	}
 
-	/** Dispara as duas requisições juntas e espera as duas terminarem. */
 	private void aoMesmoTempo(Requisicao primeira, Requisicao segunda) throws Exception {
 		CountDownLatch largada = new CountDownLatch(1);
 		ExecutorService threads = Executors.newFixedThreadPool(2);

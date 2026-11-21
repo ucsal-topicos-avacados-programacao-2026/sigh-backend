@@ -26,7 +26,6 @@ public class Usuario {
 	private String nome;
 	private String senhaHash;
 	private boolean mfaHabilitado;
-	/** Semente do TOTP: quem a tem gera os códigos do segundo fator, então fica cifrada (RNF-004, RNF-005). */
 	@Transient
 	@Cifrado(gravadoEm = "mfaSegredoCifrado")
 	private String mfaSegredo;

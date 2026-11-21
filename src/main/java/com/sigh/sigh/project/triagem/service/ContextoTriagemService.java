@@ -40,11 +40,6 @@ public class ContextoTriagemService {
 		return montar(triagem, loginEnfermeiro, Perfil.ENFERMEIRO, FINALIDADE_DO_ACESSO);
 	}
 
-	/**
-	 * Caso para a sugestão automática. O vínculo de quem a pediu já foi conferido ao abrir a triagem ou ao
-	 * registrar os sinais vitais; aqui só vale o que o histórico autorizado deixa passar (consentimento e restrições).
-	 * O acesso fica na auditoria em nome de quem pediu, com a finalidade dada.
-	 */
 	@Transactional
 	public CasoTriagemDTO montarCasoAutomatico(UUID triagemId, String login, Perfil perfil, String finalidade) {
 		Triagem triagem = triagemRepository.findById(triagemId)

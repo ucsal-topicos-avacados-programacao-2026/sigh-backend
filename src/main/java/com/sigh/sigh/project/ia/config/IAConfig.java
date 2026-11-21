@@ -21,7 +21,6 @@ public class IAConfig {
 
 	private static final Set<String> NA_PROPRIA_MAQUINA = Set.of("localhost", "127.0.0.1", "[::1]");
 
-	/** Cliente da sugestão de risco, pedida durante a triagem: espera até {@code sigh.ia.tempo-limite}. */
 	@Bean
 	public RestClient clienteHttpIA(IAProperties iaProperties,
 			@Value("${sigh.ia.restringir-destino:false}") boolean restringirDestino,
@@ -30,7 +29,6 @@ public class IAConfig {
 		return construir(iaProperties, iaProperties.tempoLimite());
 	}
 
-	/** Cliente do resumo, gerado em segundo plano: espera até {@code sigh.ia.tempo-limite-resumo}. */
 	@Bean
 	public RestClient clienteHttpIAResumo(IAProperties iaProperties,
 			@Value("${sigh.ia.restringir-destino:false}") boolean restringirDestino,
@@ -40,8 +38,6 @@ public class IAConfig {
 	}
 
 	private static RestClient construir(IAProperties iaProperties, Duration tempoLimite) {
-		// Direto ao destino validado: sem seguir redirecionamento, que levaria o dado clínico a outro destino, e
-		// sem proxy da JVM, que veria em claro o tráfego HTTP para a IA na própria máquina.
 		HttpClient conexao = HttpClient.newBuilder()
 				.connectTimeout(iaProperties.tempoLimite())
 				.followRedirects(HttpClient.Redirect.NEVER)
@@ -58,12 +54,6 @@ public class IAConfig {
 		return construtor.build();
 	}
 
-	/**
-	 * O serviço de IA recebe dado clínico em claro: é um dos dois pontos de decifragem (RNF-004). Com
-	 * {@code sigh.ia.restringir-destino} (ligado no perfil tls), o dado só sai para um destino autorizado:
-	 * um serviço na própria máquina, ou um host listado em {@code sigh.ia.hosts-autorizados}, e então só
-	 * por HTTPS. A mesma lista vai no C4, como componente autorizado a processar o dado.
-	 */
 	static void validarDestino(String url, boolean restringirDestino, String hostsAutorizados) {
 		if (!restringirDestino) {
 			return;

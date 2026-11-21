@@ -9,10 +9,6 @@ import com.sigh.sigh.project.prontuario.repository.RegistroClinicoRepository;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Alvo de uma restrição ou autorização adicional (RF-009): exatamente uma categoria de informação ou
- * um registro do próprio prontuário. Registro de outro prontuário responde como inexistente.
- */
 record AlvoDeRestricao(String categoria, RegistroClinico registro) {
 
 	static AlvoDeRestricao de(String categoria, UUID registroId, Prontuario prontuario,

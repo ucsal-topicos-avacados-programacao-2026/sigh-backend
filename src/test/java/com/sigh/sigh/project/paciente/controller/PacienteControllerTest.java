@@ -17,7 +17,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** Nova tentativa da admissão quando outro cadastro do mesmo CPF vence a corrida (RN-004). */
 class PacienteControllerTest {
 
 	private final AdmissaoPacienteService servico = mock(AdmissaoPacienteService.class);

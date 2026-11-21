@@ -48,11 +48,6 @@ public class SecurityConfig {
 		return http.build();
 	}
 
-	/**
-	 * CORS para o front-end servido de outra origem (FE-02): só as origens de {@code sigh.cors.origens-permitidas}
-	 * (separadas por vírgula), com o token no cabeçalho Authorization, sem cookies. Sem a propriedade, não há
-	 * CORS e o navegador recusa chamada de outra origem. "*" não é aceito: a API traz dado clínico.
-	 */
 	@Bean
 	public CorsConfigurationSource corsConfigurationSource(@Value("${sigh.cors.origens-permitidas:}") String origens) {
 		List<String> permitidas = Arrays.stream(origens.split(","))
@@ -66,7 +61,6 @@ public class SecurityConfig {
 		if (!permitidas.isEmpty()) {
 			CorsConfiguration cors = new CorsConfiguration();
 			cors.setAllowedOrigins(permitidas);
-			// Só os métodos que a API tem.
 			cors.setAllowedMethods(List.of("GET", "POST", "PATCH"));
 			cors.setAllowedHeaders(List.of(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE));
 			cors.setAllowCredentials(false);

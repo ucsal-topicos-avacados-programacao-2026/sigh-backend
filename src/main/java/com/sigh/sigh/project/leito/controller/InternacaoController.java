@@ -34,13 +34,11 @@ public class InternacaoController {
 
 	private final InternacaoService internacaoService;
 
-	/** Internações em andamento nos leitos da instituição, para transferir ou dar alta (FE-04). */
 	@GetMapping
 	public List<InternacaoAtivaDTO> ativas(@RequestParam UUID instituicaoId, Principal usuario) {
 		return internacaoService.internacoesAtivas(instituicaoId, usuario.getName());
 	}
 
-	/** Atendimentos em aberto sem internação: quem pode ser internado, e a fila de espera sem leito livre (FE-04). */
 	@GetMapping("/atendimentos-sem-leito")
 	public List<AtendimentoSemLeitoDTO> atendimentosSemLeito(@RequestParam UUID instituicaoId, Principal usuario) {
 		return internacaoService.atendimentosSemLeito(instituicaoId, usuario.getName());
@@ -58,7 +56,6 @@ public class InternacaoController {
 		return internacaoService.transferir(internacaoId, dados.leitoDestinoId(), usuario.getName());
 	}
 
-	/** Transferência para outra instituição da rede: pedido que o destino aceita ou recusa (BE-21). */
 	@PostMapping("/{internacaoId}/solicitacoes-transferencia")
 	@ResponseStatus(HttpStatus.CREATED)
 	public SolicitacaoTransferenciaResponseDTO solicitarTransferencia(@PathVariable UUID internacaoId,

@@ -9,16 +9,6 @@ import org.springframework.core.env.Environment;
 
 import java.util.UUID;
 
-/**
- * Listener JPA que cifra os campos {@link Cifrado} antes do INSERT e do UPDATE e os decifra ao
- * carregar a entidade, com o vínculo à tabela, à coluna e ao id da linha (RNF-004). No Hibernate desta
- * versão o id UUID já foi gerado quando o {@code @PrePersist} roda.
- *
- * <p>Na leitura, um valor que não decifra (em claro, no formato antigo, adulterado ou copiado de outra
- * linha) é recusado com {@link DadoClinicoIlegivelException} e registrado no log, sem o conteúdo. A
- * única exceção é a coluna imutável da auditoria, que continua lendo o legado só das linhas que a
- * migração listou.
- */
 public class CifragemDasEntidades {
 
 	private static final Logger log = LoggerFactory.getLogger(CifragemDasEntidades.class);

@@ -18,21 +18,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Criptografia dos dados clínicos em repouso (RNF-004): AES-256-GCM, com IV aleatório por valor e
- * etiqueta de autenticação, então um valor adulterado não é decifrado. A chave vem do ambiente
- * ({@code SIGH_CHAVE_DADOS}), nunca do código, e só o back-end a conhece: banco, cópias de segurança e
- * quem os opera veem apenas o texto cifrado.
- *
- * <p>Formato gravado: {@code sigh:v2:<idDaChave>:<base64(iv || texto cifrado || etiqueta)>}. O valor
- * fica preso à tabela, à coluna e à linha onde foi gravado (dado autenticado adicional do GCM): copiado
- * para outra linha ou outra coluna, ele não é decifrado. O id da chave permite trocar a chave atual
- * mantendo as anteriores só para leitura ({@code sigh.cripto.chaves-anteriores}).
- *
- * <p>O formato {@code sigh:v1:} (BE-09, sem vínculo à linha) e o texto claro anterior à criptografia
- * só são lidos por {@link #decifrarLegado}: pela migração ({@link ManutencaoDaCifragem}) e pela coluna
- * imutável da auditoria, que não pode ser regravada.
- */
 @Component
 public class CifraDeDadosClinicos {
 
@@ -66,29 +51,19 @@ public class CifraDeDadosClinicos {
 		}
 	}
 
-	/**
-	 * Mesma cifra a partir das propriedades. O listener JPA usa este caminho porque o Hibernate o cria
-	 * também em testes de repositório, que não carregam os componentes da aplicação.
-	 */
 	public static CifraDeDadosClinicos doAmbiente(Environment ambiente) {
 		return new CifraDeDadosClinicos(ambiente.getRequiredProperty("sigh.cripto.chave"),
 				ambiente.getProperty("sigh.cripto.chave-id", "1"), ambiente.getProperty("sigh.cripto.chaves-anteriores", ""));
 	}
 
-	/** Valor no formato atual, de qualquer chave conhecida ou não. */
 	public static boolean noFormatoAtual(String valor) {
 		return valor != null && valor.startsWith(PREFIXO);
 	}
 
-	/** Prefixo dos valores gravados com a chave atual: o que não o tem precisa ser regravado. */
 	public String prefixoDaChaveAtual() {
 		return PREFIXO + idDaChaveAtual + ":";
 	}
 
-	/**
-	 * Cifra o valor da {@code coluna} ("tabela.coluna") na linha {@code linha}. Só decifra com os
-	 * mesmos três.
-	 */
 	public String cifrar(String textoClaro, String coluna, UUID linha) {
 		if (textoClaro == null) {
 			return null;
@@ -107,10 +82,6 @@ public class CifraDeDadosClinicos {
 		}
 	}
 
-	/**
-	 * Decifra um valor no formato atual. Valor de outra linha ou coluna, adulterado, de chave
-	 * desconhecida, em claro ou no formato antigo é recusado, sem revelar nada do conteúdo.
-	 */
 	public String decifrar(String valor, String coluna, UUID linha) {
 		if (valor == null) {
 			return null;
@@ -121,10 +92,6 @@ public class CifraDeDadosClinicos {
 		return abrir(valor.substring(PREFIXO.length()), vinculo(coluna, linha), coluna, linha);
 	}
 
-	/**
-	 * Lê o que veio antes do formato atual: o {@code sigh:v1:} do BE-09 (sem vínculo à linha) ou o texto
-	 * claro gravado antes da criptografia, que volta como está. Não lê o formato atual.
-	 */
 	public String decifrarLegado(String valor, String coluna, UUID linha) {
 		if (valor == null || !valor.startsWith(PREFIXO_V1)) {
 			if (noFormatoAtual(valor)) {
@@ -159,7 +126,6 @@ public class CifraDeDadosClinicos {
 		}
 	}
 
-	/** Dado autenticado adicional: versão do formato, coluna e linha. */
 	private static byte[] vinculo(String coluna, UUID linha) {
 		if (coluna == null || coluna.isBlank() || linha == null) {
 			throw new IllegalStateException("Dado clínico cifrado precisa de coluna e linha.");

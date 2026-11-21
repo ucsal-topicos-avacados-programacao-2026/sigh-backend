@@ -26,10 +26,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * FE-06 (RF-003): o enfermeiro vê quem aguarda triagem na instituição dele, por ordem de chegada, e retoma a
- * triagem que começou e não confirmou. Quem já tem classificação confirmada está na fila, e não aqui.
- */
 class AguardandoTriagemTest extends TesteIntegracao {
 
 	private static final String TRIAGEM = """
@@ -80,7 +76,6 @@ class AguardandoTriagemTest extends TesteIntegracao {
 		assertThat(triagem).containsEntry("id", pendente.toString()).containsEntry("sintomas", "Febre")
 				.containsEntry("corSugerida", null);
 
-		// Com a sugestão da IA registrada, ela vem junto.
 		jdbc.update("update triagem set cor_sugerida = 'AMARELO' where id = ?", pendente);
 		@SuppressWarnings("unchecked")
 		Map<String, Object> comSugestao = (Map<String, Object>) aguardando(enfermeiroA).get(1).get("triagemPendente");
@@ -94,7 +89,6 @@ class AguardandoTriagemTest extends TesteIntegracao {
 		for (int i = 0; i < 4; i++) {
 			pendentes.add(registrarTriagem(atendimento, "Registro " + i));
 		}
-		// Só uma tem sugestão; pela ordem do id, ela só seria a escolhida por acaso (1 em 4).
 		UUID comSugestao = pendentes.stream().max(UUID::compareTo).orElseThrow();
 		jdbc.update("update triagem set cor_sugerida = 'LARANJA' where id = ?", comSugestao);
 

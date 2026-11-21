@@ -26,10 +26,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * BE-13 (RF-012): ter o perfil não basta. Médico, enfermeiro e administrativo só operam sobre dados
- * da instituição em que têm vínculo ativo com aquele perfil.
- */
 class VinculoObrigatorioTest extends TesteIntegracao {
 
 	private static final String REGISTRO = """

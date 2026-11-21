@@ -17,11 +17,9 @@ public interface OcupacaoLeitoRepository extends JpaRepository<OcupacaoLeito, UU
 			""")
 	Optional<OcupacaoLeito> buscarOcupacaoAtual(UUID internacaoId);
 
-	/** Instituição onde o paciente está internado agora (a do leito ocupado). */
 	@Query("select o.leito.instituicao.id from OcupacaoLeito o where o.internacao.id = :internacaoId and o.fimEm is null")
 	Optional<UUID> instituicaoDaOcupacaoAtual(UUID internacaoId);
 
-	/** Ocupações em curso nos leitos da instituição, com a internação e o paciente, pela ordem do código do leito. */
 	@Query("""
 			select o from OcupacaoLeito o
 			join fetch o.leito l

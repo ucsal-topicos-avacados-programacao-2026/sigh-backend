@@ -25,10 +25,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Consentimento amplo de compartilhamento do histórico entre as instituições da rede
- * (RF-002, RN-002, RN-007). Cada decisão gera uma nova versão; nenhuma é alterada ou apagada.
- */
 @Service
 public class ConsentimentoService {
 
@@ -53,7 +49,6 @@ public class ConsentimentoService {
 		this.clock = clock;
 	}
 
-	/** Registra a manifestação feita no primeiro cadastro (chamado dentro da admissão). */
 	@Transactional(propagation = Propagation.MANDATORY)
 	public void registrarManifestacaoInicial(Paciente paciente, DecisaoConsentimento decisao, LocalDateTime agora) {
 		novaVersao(paciente, decisao, null, null, agora);
@@ -64,7 +59,6 @@ public class ConsentimentoService {
 		return consultar(pacienteDoUsuario(login));
 	}
 
-	/** Consulta pelo titular ou pelo representante legal vigente. */
 	@Transactional(readOnly = true)
 	public ConsentimentosDoPacienteResponse consultarDoPaciente(UUID pacienteId, String login) {
 		return consultar(titularidadeService.pacienteGerenciado(login, pacienteId));
@@ -78,13 +72,11 @@ public class ConsentimentoService {
 				consentimentoRepository.historico(paciente.getId()).stream().map(ConsentimentoResponse::de).toList());
 	}
 
-	/** Revisão (autorizar) ou revogação feita pelo próprio paciente. */
 	@Transactional
 	public ConsentimentoResponse registrarDecisaoDoPaciente(String login, DecisaoPaciente decisao) {
 		return registrarDecisao(pacienteDoUsuario(login), login, decisao);
 	}
 
-	/** Revisão ou revogação pelo titular ou pelo representante legal vigente, que fica como outorgante. */
 	@Transactional
 	public ConsentimentoResponse registrarDecisaoDoPaciente(UUID pacienteId, String login, DecisaoPaciente decisao) {
 		return registrarDecisao(titularidadeService.pacienteGerenciado(login, pacienteId), login, decisao);
@@ -113,16 +105,6 @@ public class ConsentimentoService {
 		return ConsentimentoResponse.de(registrado);
 	}
 
-	/**
-	 * Indica se o histórico do paciente pode ser compartilhado com a instituição pelo consentimento amplo.
-	 * <ul>
-	 * <li>instituição inexistente ou não credenciada: não;</li>
-	 * <li>sem manifestação do paciente ou com recusa (NEGADO): não;</li>
-	 * <li>AUTORIZADO: sim;</li>
-	 * <li>REVOGADO: só as instituições que já tinham atendido o paciente até a revogação (RN-007).</li>
-	 * </ul>
-	 * Exceções de emergência (RN-003) e restrições por categoria (RF-009) não são tratadas aqui.
-	 */
 	@Transactional(readOnly = true)
 	public boolean podeCompartilharCom(UUID pacienteId, UUID instituicaoId) {
 		boolean credenciada = instituicaoRepository.findById(instituicaoId)
@@ -141,7 +123,6 @@ public class ConsentimentoService {
 				.orElse(false);
 	}
 
-	/** Hora atual na mesma precisão do PostgreSQL (microssegundos). */
 	private LocalDateTime agora() {
 		return LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
 	}
@@ -161,15 +142,10 @@ public class ConsentimentoService {
 		return gravarVersao(paciente, consentimento, agora);
 	}
 
-	/**
-	 * Grava uma decisão como a próxima versão do paciente. Usado também pelas autorizações adicionais
-	 * (RF-009), que dividem a mesma numeração de versões.
-	 */
 	Consentimento gravarVersao(Paciente paciente, Consentimento consentimento, LocalDateTime agora) {
 		consentimento.setPaciente(paciente);
 		consentimento.setVersao(consentimentoRepository.ultimaVersao(paciente.getId()) + 1);
 		consentimento.setVigenteDesde(agora);
-		// A UNIQUE (paciente_id, versao) da V3 barra versões repetidas em decisões simultâneas.
 		return consentimentoRepository.saveAndFlush(consentimento);
 	}
 }
