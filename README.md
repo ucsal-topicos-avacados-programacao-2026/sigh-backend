@@ -27,6 +27,8 @@ O último caso é o controle positivo: como a única diferença entre eles é o 
 - a regra de acesso não é `hasRole` ou `hasAnyRole`, que são as que ele sabe ler;
 - a rota não declara o método HTTP.
 
+**Perfil antes da validação (BE-28):** o `@PreAuthorize` roda depois de o Spring ler e validar o corpo e os parâmetros. Por isso, um perfil sem permissão que mandava uma requisição incompleta recebia 400 (requisição inválida) em vez de 403, e a resposta revelava o formato da rota. O `PerfilAntesDaRequisicao` aplica a mesma regra `hasRole`/`hasAnyRole` antes de ler a requisição; o `@PreAuthorize` continua como segunda checagem. O `PerfilAntesDaValidacaoTest` percorre as rotas do Spring e, para cada perfil que a rota não aceita, manda uma requisição incompleta e exige 403.
+
 ## Transferência entre instituições (RF-006)
 
 A ERS (Processo 2, Gestão de Leitos) diz que, sem leito na unidade e com leito em outra da rede, "solicita-se transferência para outra unidade da rede", e a unidade de destino executa o próprio processo. Por isso (BE-21):
