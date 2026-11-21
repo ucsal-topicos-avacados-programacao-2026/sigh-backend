@@ -9,10 +9,6 @@ import org.testcontainers.utility.MountableFile;
 import java.nio.file.Path;
 import java.time.Duration;
 
-/**
- * O PostgreSQL 17 do SIGH como em produção: a imagem {@code docker/backup} subindo com
- * {@code iniciar-banco.sh}, só com TLS (sem TLS, a conexão é recusada) e com o certificado fictício.
- */
 public final class BancoDoSigh {
 
 	public static final String USUARIO = "sigh";
@@ -23,7 +19,6 @@ public final class BancoDoSigh {
 	private BancoDoSigh() {
 	}
 
-	/** Imagem montada a partir do Dockerfile e dos scripts do repositório (a mesma de produção). */
 	public static synchronized ImageFromDockerfile imagem() {
 		if (imagem == null) {
 			imagem = new ImageFromDockerfile("sigh-backup-teste", false)
@@ -33,7 +28,6 @@ public final class BancoDoSigh {
 		return imagem;
 	}
 
-	/** Certificado do servidor válido para o endereço do Docker visto daqui e para o apelido "banco". */
 	public static CertificadoDeTeste certificado() throws Exception {
 		String host = DockerClientFactory.instance().dockerHostIpAddress();
 		String daqui = host.matches("[0-9.]+") ? "ip:" + host : "dns:" + host;
@@ -53,7 +47,6 @@ public final class BancoDoSigh {
 						.withStartupTimeout(Duration.ofMinutes(3)));
 	}
 
-	/** URL JDBC com TLS e o certificado do servidor conferido, como a de produção. */
 	public static String urlComTls(GenericContainer<?> banco, CertificadoDeTeste certificado) {
 		return urlSemSslmode(banco) + "?sslmode=verify-full&sslrootcert=" + certificado.certificadoPem();
 	}

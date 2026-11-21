@@ -31,7 +31,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
-/** Dados fictícios para os testes. Cada chamada gera registros novos, sem depender de outros testes. */
 @TestComponent
 public class Cenario {
 
@@ -62,17 +61,14 @@ public class Cenario {
 		this.clock = clock;
 	}
 
-	/** Triagem do atendimento com a classificação de risco confirmada, por um enfermeiro da instituição. */
 	public UUID classificarRisco(UUID atendimentoId, Instituicao instituicao, CorRisco cor) {
 		return classificarRisco(atendimentoId, cor, profissional(instituicao, Perfil.ENFERMEIRO));
 	}
 
-	/** O mesmo, por um enfermeiro informado (precisa ter vínculo na instituição do atendimento). */
 	public UUID classificarRisco(UUID atendimentoId, CorRisco cor, String enfermeiro) {
 		return classificarRisco(atendimentoId, cor, enfermeiro, enfermeiro);
 	}
 
-	/** Um enfermeiro registra a triagem e outro confirma a classificação. */
 	public UUID classificarRisco(UUID atendimentoId, CorRisco cor, String registrador, String confirmador) {
 		UUID triagem = triagemService.registrar(new TriagemRequestDTO(atendimentoId, "Dor torácica intensa",
 				new SinaisVitaisDTO("90/60", 130, 28, new BigDecimal("36.5"), new BigDecimal("88.0"))), registrador).id();
@@ -80,12 +76,10 @@ public class Cenario {
 		return triagem;
 	}
 
-	/** Profissional com vínculo ativo na instituição (BE-13); retorna o login. */
 	public String profissional(Instituicao instituicao, Perfil perfil) {
 		return vinculo(instituicao, perfil, LocalDateTime.now(clock).minusDays(30), null);
 	}
 
-	/** Registro clínico fictício no prontuário do paciente, com origem na instituição; retorna o id. */
 	@Transactional
 	public UUID registroClinico(UUID pacienteId, Instituicao origem, String categoria, String conteudo) {
 		RegistroClinico registro = new RegistroClinico();
@@ -99,7 +93,6 @@ public class Cenario {
 		return registroClinicoRepository.save(registro).getId();
 	}
 
-	/** Usuário com perfil Paciente que representa o paciente no período informado; retorna o login. */
 	@Transactional
 	public String representante(UUID pacienteId, LocalDateTime inicio, LocalDateTime fim) {
 		Usuario usuario = usuario(Perfil.PACIENTE);
@@ -121,13 +114,11 @@ public class Cenario {
 		return instituicaoRepository.save(instituicao);
 	}
 
-	/** Usuário com vínculo administrativo ativo na instituição; retorna o login. */
 	public String administrativo(Instituicao instituicao) {
 		LocalDateTime agora = LocalDateTime.now(clock);
 		return vinculo(instituicao, Perfil.ADMINISTRATIVO, agora.minusDays(30), null);
 	}
 
-	/** Usuário com vínculo de recepção ativo na instituição; retorna o login. */
 	public String recepcao(Instituicao instituicao) {
 		LocalDateTime agora = LocalDateTime.now(clock);
 		return vinculo(instituicao, Perfil.RECEPCAO, agora.minusDays(30), null);
@@ -145,7 +136,6 @@ public class Cenario {
 		return usuario.getLogin();
 	}
 
-	/** Cria a conta de acesso do paciente e a vincula ao cadastro; retorna o login. */
 	@Transactional
 	public String contaDoPaciente(UUID pacienteId) {
 		Usuario usuario = usuario(Perfil.PACIENTE);
@@ -165,7 +155,6 @@ public class Cenario {
 		return usuarioRepository.save(usuario);
 	}
 
-	/** CPF fictício válido e diferente a cada chamada. */
 	public static String novoCpf() {
 		String base = String.valueOf(SEQUENCIA_CPF.incrementAndGet());
 		int d1 = digito(base, 9);

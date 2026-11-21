@@ -7,10 +7,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * Relógio controlado pelos testes, para que datas e horários sejam determinísticos. Usa o mesmo
- * fuso padrão da aplicação, diferente do fuso da JVM dos testes (UTC, definido no pom).
- */
 public class RelogioDeTeste extends Clock {
 
 	public static final ZoneId FUSO = ZoneId.of("America/Bahia");
@@ -21,7 +17,6 @@ public class RelogioDeTeste extends Clock {
 		this.agora = new AtomicReference<>(inicio);
 	}
 
-	/** Relógio parado na data e hora local informada, no fuso {@link #FUSO}. */
 	public static RelogioDeTeste em(LocalDateTime horaLocal) {
 		return new RelogioDeTeste(horaLocal.atZone(FUSO).toInstant());
 	}

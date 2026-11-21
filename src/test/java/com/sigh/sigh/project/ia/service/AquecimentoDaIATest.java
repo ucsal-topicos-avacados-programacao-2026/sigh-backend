@@ -17,7 +17,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-/** BE-25: ao subir, o modelo é carregado pela fila dos resumos; uma falha não derruba a aplicação. */
 class AquecimentoDaIATest {
 
 	private final ClienteIA clienteIA = mock(ClienteIA.class);

@@ -54,7 +54,6 @@ public class RegistroAuditoria {
 	@Getter(AccessLevel.NONE)
 	@Setter(AccessLevel.NONE)
 	private String justificativaCifrado;
-	/** A justificativa desta linha já existia antes da cifragem com vínculo (lista gravada na migração V6). */
 	@Formula("(exists (select 1 from auditoria_justificativa_legada l where l.registro_id = id))")
 	@Getter(AccessLevel.NONE)
 	@Setter(AccessLevel.NONE)

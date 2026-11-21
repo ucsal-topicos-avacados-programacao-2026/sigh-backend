@@ -12,16 +12,10 @@ import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Certificado fictício de teste, gerado na hora com o keytool do JDK e exportado em PEM, como os de
- * produção (certificado e chave privada vindos do ambiente). Autoassinado: ele mesmo é a autoridade em
- * que o cliente confia.
- */
 public record CertificadoDeTeste(Path keystore, Path certificadoPem, Path chavePem) {
 
 	private static final String SENHA = "senha-ficticia-do-teste";
 
-	/** {@code nomes}: entradas do SAN, como "dns:localhost" ou "ip:127.0.0.1". */
 	public static CertificadoDeTeste gerar(String... nomes) throws Exception {
 		Path keystore = Files.createTempDirectory("sigh-tls").resolve("certificado.p12");
 		Process keytool = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "keytool").toString(),
@@ -40,7 +34,6 @@ public record CertificadoDeTeste(Path keystore, Path certificadoPem, Path chaveP
 		return new CertificadoDeTeste(keystore, certificado, chave);
 	}
 
-	/** Contexto TLS de um cliente que confia só neste certificado. */
 	public SSLContext contextoQueConfia() throws Exception {
 		TrustManagerFactory fabrica = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
 		fabrica.init(carregar(keystore));

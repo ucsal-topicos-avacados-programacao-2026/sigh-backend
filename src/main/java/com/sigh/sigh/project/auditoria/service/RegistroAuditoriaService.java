@@ -49,10 +49,6 @@ public class RegistroAuditoriaService {
 		registroAuditoriaRepository.save(registro);
 	}
 
-	/**
-	 * Registra uma tentativa recusada numa transação própria: a recusa desfaz a transação de quem a
-	 * pediu, e a tentativa precisa ficar na auditoria mesmo assim (BE-24).
-	 */
 	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public void registrarTentativaRecusada(AcessoProntuarioDTO tentativa) {
 		registrarAcesso(tentativa);

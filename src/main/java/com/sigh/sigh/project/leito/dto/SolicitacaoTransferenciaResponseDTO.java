@@ -7,10 +7,6 @@ import com.sigh.sigh.project.leito.entity.StatusSolicitacaoTransferencia;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-/**
- * Solicitação de transferência. Traz só o nome do paciente (identificação, para o destino preparar a
- * recepção); dado clínico continua no prontuário, sob as regras de consentimento.
- */
 public record SolicitacaoTransferenciaResponseDTO(
 		UUID id,
 		UUID internacaoId,

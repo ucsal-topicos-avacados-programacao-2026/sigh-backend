@@ -147,7 +147,6 @@ class InternacaoServiceTest {
 		assertThat(destino.getStatus()).isEqualTo(StatusLeito.OCUPADO);
 	}
 
-	/** BE-21: para leito de outra instituição, só por solicitação aceita pelo destino. */
 	@Test
 	void transferenciaDiretaParaLeitoDeOutraInstituicaoEhRecusada() {
 		Internacao internacao = novaInternacao();

@@ -66,10 +66,6 @@ class ConsentimentoTest extends TesteIntegracao {
 	@Autowired
 	RegistroClinicoRepository registroClinicoRepository;
 
-	/**
-	 * RN-007 no histórico compartilhado (BE-06): depois da revogação, a instituição que já tinha
-	 * atendido o paciente continua vendo o histórico; a que só atende depois não vê nada.
-	 */
 	@Test
 	void historicoCompartilhadoRespeitaARevogacaoApenasParaNovasInstituicoes() throws Exception {
 		Instituicao hospitalA = cenario.instituicao(true);
@@ -104,7 +100,6 @@ class ConsentimentoTest extends TesteIntegracao {
 				.andExpect(jsonPath("$.historico.length()").value(1));
 	}
 
-	/** Critério de aceite: a revogação passa a valer apenas para novas instituições (RN-007). */
 	@Test
 	void revogacaoValeApenasParaInstituicoesQueAindaNaoAtenderamOPaciente() throws Exception {
 		Instituicao hospitalA = cenario.instituicao(true);
@@ -128,12 +123,10 @@ class ConsentimentoTest extends TesteIntegracao {
 		assertThat(consentimentoService.podeCompartilharCom(pacienteId, hospitalB.getId())).isTrue();
 		assertThat(consentimentoService.podeCompartilharCom(pacienteId, hospitalC.getId())).isFalse();
 
-		// Atender depois da revogação não dá acesso ao histórico compartilhado.
 		relogio.avancar(Duration.ofHours(2));
 		admitir(hospitalC, cpf, "AUTORIZADO");
 		assertThat(consentimentoService.podeCompartilharCom(pacienteId, hospitalC.getId())).isFalse();
 
-		// A revogação não apaga nada: as versões anteriores continuam no histórico.
 		assertThat(consentimentoRepository.historico(pacienteId)).extracting(Consentimento::getDecisao)
 				.containsExactly(DecisaoConsentimento.AUTORIZADO, DecisaoConsentimento.REVOGADO);
 	}
@@ -239,7 +232,6 @@ class ConsentimentoTest extends TesteIntegracao {
 				.andReturn();
 		assertThat(resultado.getResponse().getContentAsString()).doesNotContain(idDoOutro);
 
-		// A revogação de um paciente não afeta o outro.
 		mvc.perform(decisao(loginUm, "REVOGADO")).andExpect(status().isCreated());
 		assertThat(consentimentoRepository.historico(pacienteDois)).hasSize(1);
 	}

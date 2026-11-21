@@ -39,7 +39,6 @@ public class TriagemController {
 	private final FilaAtendimentoService filaAtendimentoService;
 	private final SugestaoRiscoService sugestaoRiscoService;
 
-	/** Quem aguarda triagem na instituição, com a triagem começada e não confirmada, se houver (FE-06). */
 	@GetMapping("/aguardando")
 	@PreAuthorize("hasRole('ENFERMEIRO')")
 	public List<AguardandoTriagemDTO> aguardando(@RequestParam UUID instituicaoId, Principal usuario) {
@@ -53,7 +52,6 @@ public class TriagemController {
 		return triagemService.registrar(dados, usuario.getName());
 	}
 
-	/** Sinais vitais numa triagem aberta na recepção; a IA refaz a sugestão em segundo plano. */
 	@PatchMapping("/{triagemId}/sinais-vitais")
 	@PreAuthorize("hasRole('ENFERMEIRO')")
 	public TriagemResponseDTO registrarSinaisVitais(@PathVariable UUID triagemId,
@@ -61,7 +59,6 @@ public class TriagemController {
 		return triagemService.registrarSinaisVitais(triagemId, dados.sinaisVitais(), usuario.getName());
 	}
 
-	/** Só o andamento da sugestão, nunca a cor: quem recebe o paciente não vê dado clínico. */
 	@GetMapping("/pre-classificacao")
 	@PreAuthorize("hasRole('RECEPCAO')")
 	public PreClassificacaoResponseDTO preClassificacao(@RequestParam UUID atendimentoId,

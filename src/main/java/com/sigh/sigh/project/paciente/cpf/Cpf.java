@@ -2,10 +2,6 @@ package com.sigh.sigh.project.paciente.cpf;
 
 import java.util.regex.Pattern;
 
-/**
- * Normalização e validação de CPF (RF-001).
- * Aceita o CPF com ou sem máscara (000.000.000-00) e guarda apenas os 11 dígitos.
- */
 public final class Cpf {
 
 	private static final Pattern FORMATO = Pattern.compile("^\\d{3}\\.?\\d{3}\\.?\\d{3}-?\\d{2}$");
@@ -29,11 +25,6 @@ public final class Cpf {
 				&& digitoVerificador(digitos, 10) == digitos.charAt(10) - '0';
 	}
 
-	/**
-	 * Retorna os 11 dígitos do CPF.
-	 *
-	 * @throws IllegalArgumentException se o CPF for inválido
-	 */
 	public static String normalizar(String valor) {
 		if (!ehValido(valor)) {
 			throw new IllegalArgumentException("CPF inválido");

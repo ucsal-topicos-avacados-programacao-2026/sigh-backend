@@ -12,7 +12,6 @@ import java.util.UUID;
 
 public interface RepresentacaoLegalRepository extends JpaRepository<RepresentacaoLegal, UUID> {
 
-	/** O usuário representa o paciente agora (início já passou e o fim ainda não chegou). */
 	@Query("""
 			select count(r) > 0 from RepresentacaoLegal r
 			where r.paciente.id = :pacienteId

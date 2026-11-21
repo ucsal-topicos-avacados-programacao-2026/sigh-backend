@@ -35,10 +35,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TriagemService {
 
-	/**
-	 * A triagem de chegada (aberto ou em triagem) e a reclassificação durante o atendimento (BE-24): o
-	 * paciente pode piorar ou melhorar depois de o médico começar. Só o atendimento encerrado não aceita.
-	 */
 	private static final Set<StatusAtendimento> STATUS_QUE_ACEITAM_TRIAGEM =
 			EnumSet.of(StatusAtendimento.ABERTO, StatusAtendimento.EM_TRIAGEM, StatusAtendimento.EM_ATENDIMENTO);
 
@@ -63,17 +59,12 @@ public class TriagemService {
 		triagem.setSintomas(dados.sintomas());
 		triagem.setSinaisVitais(dados.sinaisVitais().paraEntidade());
 		triagem.setRegistrador(usuarioService.buscarPorLogin(loginEnfermeiro));
-		// A reclassificação durante o atendimento não devolve o paciente para a fila de triagem.
 		if (atendimento.getStatus() != StatusAtendimento.EM_ATENDIMENTO) {
 			atendimento.setStatus(StatusAtendimento.EM_TRIAGEM);
 		}
 		return TriagemResponseDTO.de(triagemRepository.save(triagem));
 	}
 
-	/**
-	 * A triagem nasce na admissão, com o motivo dito na recepção como sintoma e sem sinais vitais, e a IA é
-	 * chamada em segundo plano depois que a admissão for gravada. A recepção só informa o que o paciente sente.
-	 */
 	@Transactional
 	public void abrirNaAdmissao(Atendimento atendimento, String loginRecepcao) {
 		Triagem triagem = new Triagem();
@@ -87,7 +78,6 @@ public class TriagemService {
 				"Pré-classificação por IA na admissão"));
 	}
 
-	/** O enfermeiro mede os sinais vitais numa triagem que já nasceu na recepção; a IA refaz a sugestão sozinha. */
 	@Transactional
 	public TriagemResponseDTO registrarSinaisVitais(UUID triagemId, SinaisVitaisDTO sinaisVitais, String loginEnfermeiro) {
 		Triagem triagem = triagemRepository.findById(triagemId)
@@ -105,14 +95,12 @@ public class TriagemService {
 		return TriagemResponseDTO.de(triagem);
 	}
 
-	/** A IA falhou ou demorou: a triagem segue sem sugestão nova, e a cor fica com o enfermeiro. */
 	@Transactional
 	public void marcarSugestaoIndisponivel(UUID triagemId) {
 		triagemRepository.findById(triagemId).filter(t -> t.getCorConfirmada() == null)
 				.ifPresent(t -> t.setSituacaoSugestao(SituacaoSugestao.INDISPONIVEL));
 	}
 
-	/** Andamento da sugestão, para a recepção acompanhar sem ver a cor (RF-012). */
 	@Transactional(readOnly = true)
 	public PreClassificacaoResponseDTO andamentoDaSugestao(UUID atendimentoId, UUID instituicaoId, String loginRecepcao) {
 		vinculoService.exigirVinculoAtivo(loginRecepcao, instituicaoId, Perfil.RECEPCAO);

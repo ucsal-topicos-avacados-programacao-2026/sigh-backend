@@ -15,16 +15,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Fila dos resumos por IA: um por vez, porque o serviço de IA local atende um pedido por vez, e pedidos em
- * paralelo só esperariam lá, estourando o tempo-limite. Com a fila cheia ({@code sigh.ia.fila-maxima-resumos}),
- * o pedido é recusado na hora.
- * <p>
- * A fila fica na memória e sabe quais resumos estão nela ou em geração ({@link #pendente}). Um resumo
- * "em geração" que não está aqui não vai mais ser gerado: a tarefa terminou sem conseguir gravar o resultado,
- * ou a aplicação parou. A consulta o mostra como falho ({@link ResumoHistoricoService#consultar}), e a subida
- * da aplicação também ({@link RecuperacaoDosResumos}).
- */
 @Component
 public class FilaDeResumosIA implements DisposableBean {
 
@@ -45,7 +35,6 @@ public class FilaDeResumosIA implements DisposableBean {
 				new ThreadPoolExecutor.AbortPolicy());
 	}
 
-	/** Põe na fila a geração do resumo. Lança {@link RejectedExecutionException} se a fila estiver cheia. */
 	public void enfileirar(UUID resumoId, Runnable tarefa) {
 		pendentes.add(resumoId);
 		try {
@@ -62,17 +51,14 @@ public class FilaDeResumosIA implements DisposableBean {
 		}
 	}
 
-	/** Põe na fila uma tarefa que não é um resumo, como o aquecimento do modelo. */
 	public void enfileirar(Runnable tarefa) {
 		executor.execute(() -> rodar(tarefa));
 	}
 
-	/** Se o resumo está na fila ou em geração agora. */
 	public boolean pendente(UUID resumoId) {
 		return pendentes.contains(resumoId);
 	}
 
-	/** A falha fica no log da aplicação, só com o tipo: a mensagem poderia trazer dado clínico. */
 	private static void rodar(Runnable tarefa) {
 		try {
 			tarefa.run();

@@ -17,7 +17,6 @@ public class UsuarioController {
 
 	private final UsuarioService usuarioService;
 
-	/** Quem está logado: o front-end monta o menu e o seletor de instituição com isto (FE-02). */
 	@GetMapping("/eu")
 	@PreAuthorize("hasAnyRole('PACIENTE', 'ENFERMEIRO', 'MEDICO', 'ADMINISTRATIVO', 'RECEPCAO', 'AUDITOR_GESTOR')")
 	public UsuarioLogadoDTO eu(Principal usuario) {

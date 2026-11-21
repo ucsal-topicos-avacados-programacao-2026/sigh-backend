@@ -12,7 +12,6 @@ import java.util.UUID;
 
 public interface VinculoInstitucionalRepository extends JpaRepository<VinculoInstitucional, UUID> {
 
-	/** Vínculos ativos agora, com a instituição e os perfis carregados. */
 	@Query("""
 			select distinct v from VinculoInstitucional v
 			join fetch v.instituicao
@@ -23,7 +22,6 @@ public interface VinculoInstitucionalRepository extends JpaRepository<VinculoIns
 			""")
 	List<VinculoInstitucional> buscarAtivos(@Param("login") String login, @Param("agora") LocalDateTime agora);
 
-	/** Verifica se o usuário tem vínculo ativo com a instituição e o perfil habilitado nela. */
 	@Query("""
 			select count(v) > 0 from VinculoInstitucional v join v.perfisHabilitados p
 			where v.usuario.login = :login

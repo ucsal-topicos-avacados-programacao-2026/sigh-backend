@@ -11,11 +11,6 @@ import org.springframework.stereotype.Service;
 import java.util.UUID;
 import java.util.concurrent.RejectedExecutionException;
 
-/**
- * Resumo do histórico por IA (RF-004), gerado em segundo plano: o pedido volta na hora com o resumo em
- * geração, e o médico consulta o resultado em {@code GET /resumos/{id}}. Assim, vários pedidos ao mesmo
- * tempo esperam na fila, em vez de estourarem o tempo-limite no serviço de IA.
- */
 @Service
 @RequiredArgsConstructor
 public class GeracaoResumoService {
@@ -38,11 +33,6 @@ public class GeracaoResumoService {
 		return resumoHistoricoService.emGeracao(caso.resumoId());
 	}
 
-	/**
-	 * Antes de mandar o histórico à IA, confere de novo a autorização: na fila, o paciente pode ter restringido
-	 * um registro (RF-009) ou o médico pode ter perdido o vínculo. Uma falha deixa o resumo como falho; se nem
-	 * isso puder ser gravado (banco fora), a consulta o mostra como falho depois, porque ele saiu da fila.
-	 */
 	void gerarEmSegundoPlano(CasoResumoDTO caso) {
 		try {
 			if (!resumoHistoricoService.continuaAutorizado(caso.resumoId())) {

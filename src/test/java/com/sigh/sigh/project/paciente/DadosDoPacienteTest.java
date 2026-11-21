@@ -31,10 +31,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Rotas do titular e do representante legal sobre os dados do paciente: histórico (BE-16),
- * restrições e autorizações adicionais (BE-07) e consentimento pelo representante (BE-15).
- */
 class DadosDoPacienteTest extends TesteIntegracao {
 
 	@Autowired
@@ -141,7 +137,6 @@ class DadosDoPacienteTest extends TesteIntegracao {
 		comoPaciente(get("/api/pacientes/gerenciados"), representante).andExpect(jsonPath("$.length()").value(0));
 	}
 
-	/** A leitura do prontuário pelo representante fica na auditoria; a do próprio titular, não. */
 	@Test
 	void leituraPeloRepresentanteFicaNaAuditoria() throws Exception {
 		LocalDateTime agora = LocalDateTime.now(relogio);
@@ -157,7 +152,6 @@ class DadosDoPacienteTest extends TesteIntegracao {
 				.andExpect(jsonPath("$.content[0].perfil").value("PACIENTE"));
 	}
 
-	/** BE-19: o representante vigente também acompanha quem acessou o prontuário do representado. */
 	@Test
 	void representanteVeOsAcessosAoProntuarioEOutroUsuarioNao() throws Exception {
 		LocalDateTime agora = LocalDateTime.now(relogio);

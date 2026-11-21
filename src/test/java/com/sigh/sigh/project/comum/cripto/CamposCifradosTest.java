@@ -6,10 +6,6 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Quem cifrar um campo novo e esquecer uma das peças é barrado ao subir a aplicação, em vez de o dado ir
- * em claro para o banco ou a alteração se perder sem aviso.
- */
 class CamposCifradosTest {
 
 	@Test

@@ -15,10 +15,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.Map;
 import java.util.TreeMap;
 
-/**
- * Respostas de erro em formato ProblemDetail (RFC 9457).
- * Nunca devolve stack trace, mensagens do banco ou os valores enviados (ex.: CPF).
- */
 @RestControllerAdvice
 public class TratadorDeErros {
 
@@ -53,11 +49,6 @@ public class TratadorDeErros {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage());
 	}
 
-	/**
-	 * Só a violação de UNIQUE é conflito de operações simultâneas (409). Qualquer outra violação
-	 * de integridade é erro interno (500). A mensagem do banco pode conter dados pessoais e não é
-	 * repassada nem registrada; o log guarda apenas o SQLState.
-	 */
 	@ExceptionHandler(DataIntegrityViolationException.class)
 	public ProblemDetail integridade(DataIntegrityViolationException ex) {
 		if (ViolacaoDeUnicidade.eh(ex)) {
@@ -69,10 +60,6 @@ public class TratadorDeErros {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "Erro interno.");
 	}
 
-	/**
-	 * Dado clínico que não decifra (gravado fora da aplicação, copiado de outra linha ou adulterado): a
-	 * leitura é recusada (RNF-004). O log já tem a coluna e a linha; a resposta não diz nada do dado.
-	 */
 	@ExceptionHandler(DadoClinicoIlegivelException.class)
 	public ProblemDetail dadoClinicoIlegivel(DadoClinicoIlegivelException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,

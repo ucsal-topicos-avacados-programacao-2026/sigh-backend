@@ -11,10 +11,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Consultas de contagem do painel (FE-09). Nenhuma devolve dado de paciente: só quantidades, cores e horários de
- * chegada. As regras de "aguardando triagem" e "na fila" são as mesmas do TriagemRepository.
- */
 public interface PainelRepository extends Repository<Instituicao, UUID> {
 
 	@Query("""
@@ -25,7 +21,6 @@ public interface PainelRepository extends Repository<Instituicao, UUID> {
 			""")
 	List<LeitosDoPainelDTO> leitos(UUID instituicaoId);
 
-	/** Em aberto ou em triagem, sem classificação confirmada (a lista "Aguardando triagem" do enfermeiro). */
 	@Query("""
 			select new com.sigh.sigh.project.painel.dto.ContagemComChegada(count(a), min(a.chegadaEm))
 			from Atendimento a
@@ -36,7 +31,6 @@ public interface PainelRepository extends Repository<Instituicao, UUID> {
 			""")
 	ContagemComChegada aguardandoTriagem(UUID instituicaoId);
 
-	/** Classificados à espera do médico, com a cor confirmada mais recente (a fila do enfermeiro). */
 	@Query("""
 			select new com.sigh.sigh.project.painel.dto.ChegadaNaFila(t.corConfirmada, a.chegadaEm)
 			from Triagem t
@@ -57,7 +51,6 @@ public interface PainelRepository extends Repository<Instituicao, UUID> {
 			""")
 	long emAtendimento(UUID instituicaoId);
 
-	/** Internações em curso num leito da instituição (onde o paciente está agora). */
 	@Query("""
 			select count(o) from OcupacaoLeito o
 			where o.leito.instituicao.id = :instituicaoId and o.fimEm is null and o.internacao.altaEm is null
