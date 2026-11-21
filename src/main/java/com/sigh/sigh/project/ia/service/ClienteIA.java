@@ -63,7 +63,6 @@ public class ClienteIA {
 		return resumo;
 	}
 
-	/** Pedido mínimo, só para o serviço de IA carregar o modelo antes do primeiro pedido de verdade. */
 	public void aquecer() {
 		enviar(clienteHttpIAResumo, montarPedido(INSTRUCOES_AQUECIMENTO, "ok", null));
 	}

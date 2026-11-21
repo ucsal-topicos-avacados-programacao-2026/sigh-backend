@@ -21,10 +21,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Restrição de informações sensíveis pelo paciente ou representante legal (RF-009). A restrição não
- * apaga nada: encerrá-la só preenche o fim da vigência, e o histórico de restrições fica guardado.
- */
 @Service
 @RequiredArgsConstructor
 public class RestricaoService {
@@ -86,7 +82,6 @@ public class RestricaoService {
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Prontuário não encontrado."));
 	}
 
-	/** Hora atual na mesma precisão do PostgreSQL (microssegundos). */
 	private LocalDateTime agora() {
 		return LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
 	}

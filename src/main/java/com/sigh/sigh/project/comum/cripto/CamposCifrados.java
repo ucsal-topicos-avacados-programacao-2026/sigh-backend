@@ -26,11 +26,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Os campos cifrados ({@link Cifrado}) de uma entidade, inclusive os de objetos embutidos, com a coluna
- * de cada um. É a mesma lista que o listener JPA e a manutenção da cifragem (que trabalha direto no
- * banco) usam, então os dois sempre concordam sobre qual coluna é cifrada e com qual vínculo.
- */
 public final class CamposCifrados {
 
 	private static final String PACOTE_DAS_ENTIDADES = "com.sigh.sigh.project";
@@ -40,19 +35,13 @@ public final class CamposCifrados {
 	private final Field id;
 	private final List<Campo> campos;
 
-	/**
-	 * Um campo cifrado. {@code embutidoEm} é o campo da entidade que guarda o objeto embutido, ou nulo
-	 * quando o campo é da própria entidade.
-	 */
 	public record Campo(String tabela, String coluna, Field claro, Field gravado, Field embutidoEm, Field legadoSe,
 			String legadoListadoEm) {
 
-		/** Coluna de tabela imutável: nunca regravada, lê o legado só das linhas listadas na migração. */
 		public boolean legadoImutavel() {
 			return legadoSe != null;
 		}
 
-		/** "tabela.coluna": entra no vínculo do valor cifrado. */
 		public String nome() {
 			return tabela + "." + coluna;
 		}
@@ -152,12 +141,6 @@ public final class CamposCifrados {
 		return Optional.of(new Campo(tabela, coluna.name(), claro, gravado, embutidoEm, legadoSe, marca.legadoListadoEm()));
 	}
 
-	/**
-	 * O setter do campo em claro precisa pôr {@link Cifrado#PENDENTE} no campo gravado; sem isso, uma
-	 * alteração (inclusive de nulo para preenchido) não deixa a entidade suja, o Hibernate não faz o
-	 * UPDATE e a mudança se perde sem aviso. Confere numa instância
-	 * nova, ao montar os metadados (na inicialização da aplicação).
-	 */
 	private static void conferirSetter(Class<?> dono, Field claro, Field gravado) {
 		String nome = "set" + Character.toUpperCase(claro.getName().charAt(0)) + claro.getName().substring(1);
 		Method setter;
@@ -183,7 +166,6 @@ public final class CamposCifrados {
 		}
 	}
 
-	/** Campos cifrados da entidade (vazio se ela não tiver nenhum). */
 	public static CamposCifrados de(Class<?> classe) {
 		Class<?> entidade = classe;
 		while (entidade != null && !entidade.isAnnotationPresent(Entity.class)) {
@@ -195,7 +177,6 @@ public final class CamposCifrados {
 		return POR_ENTIDADE.computeIfAbsent(entidade, CamposCifrados::new);
 	}
 
-	/** Todos os campos cifrados das entidades da aplicação, em ordem de tabela e coluna. */
 	public static List<Campo> daAplicacao() {
 		List<Campo> lista = daAplicacao;
 		if (lista == null) {

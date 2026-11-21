@@ -14,13 +14,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 import java.time.LocalDateTime;
 
-/** Base dos testes de integração: PostgreSQL real (Testcontainers), MockMvc e relógio controlado. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import({TestcontainersConfiguration.class, TesteIntegracao.Relogio.class, Cenario.class})
 public abstract class TesteIntegracao {
 
-	/** 10/11/2026 às 12:00 no fuso da aplicação (15:00 UTC). */
 	protected static final Instant INICIO = LocalDateTime.of(2026, 11, 10, 12, 0).atZone(RelogioDeTeste.FUSO).toInstant();
 
 	@Autowired

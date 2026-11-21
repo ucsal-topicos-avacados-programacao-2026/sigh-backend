@@ -17,10 +17,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * O serviço de IA recebe dado clínico em claro (ponto de decifragem, RNF-004). No perfil tls, o dado só sai
- * para a própria máquina ou para um host autorizado, por HTTPS, e vai direto: sem redirecionamento e sem proxy.
- */
 class IAConfigTest {
 
 	private static final String AUTORIZADOS = "ia.rede-sigh.org, IA.Hospital.org";
@@ -141,7 +137,6 @@ class IAConfigTest {
 		}
 	}
 
-	/** A sugestão da triagem espera até tempo-limite; o resumo, em segundo plano, até tempo-limite-resumo. */
 	@Test
 	void clienteDoResumoEsperaMaisQueODaTriagem() throws Exception {
 		HttpServer iaLenta = servidor();

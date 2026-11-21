@@ -32,11 +32,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 
-/**
- * BE-28 (RF-012): em toda rota, um perfil sem permissão recebe 403 mesmo com a requisição incompleta (corpo vazio,
- * sem parâmetros obrigatórios). Antes, a validação rodava antes da checagem de perfil e a resposta era 400, o que
- * revelava o formato da rota. As rotas vêm do próprio Spring: uma rota nova entra na conferência sozinha.
- */
 class PerfilAntesDaValidacaoTest extends TesteIntegracao {
 
 	private static final Pattern PERFIL = Pattern.compile("'([A-Z_]+)'");
@@ -56,7 +51,6 @@ class PerfilAntesDaValidacaoTest extends TesteIntegracao {
 			if (!metodo.getBeanType().getPackageName().startsWith("com.sigh")) {
 				continue;
 			}
-			// A mesma busca do interceptor: a regra do método e, sem ela, a da classe.
 			PreAuthorize regra = AnnotatedElementUtils.findMergedAnnotation(metodo.getMethod(), PreAuthorize.class);
 			if (regra == null) {
 				regra = AnnotatedElementUtils.findMergedAnnotation(metodo.getBeanType(), PreAuthorize.class);
@@ -79,7 +73,6 @@ class PerfilAntesDaValidacaoTest extends TesteIntegracao {
 	void haRotasParaConferir() {
 		List<Caso> casos = casos();
 		assertThat(casos).as("rotas com @PreAuthorize e algum perfil de fora").hasSizeGreaterThan(150);
-		// Inclui rotas com a regra só na classe (ex.: DadosDoPacienteController, InternacaoController).
 		assertThat(casos).extracting(Caso::caminho).anyMatch(c -> c.startsWith("/internacoes"))
 				.anyMatch(c -> c.matches("/api/pacientes/[^/]+/restricoes"));
 	}

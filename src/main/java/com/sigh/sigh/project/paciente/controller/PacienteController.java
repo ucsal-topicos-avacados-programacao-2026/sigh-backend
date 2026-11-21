@@ -44,8 +44,6 @@ public class PacienteController {
 			if (!ViolacaoDeUnicidade.eh(e)) {
 				throw e;
 			}
-			// Outra recepção cadastrou o mesmo CPF ao mesmo tempo. Uma nova tentativa, em nova
-			// transação, encontra o cadastro e vincula o atendimento ao prontuário existente (RN-004).
 			return admissaoService.admitir(requisicao, autenticacao.getName());
 		}
 	}

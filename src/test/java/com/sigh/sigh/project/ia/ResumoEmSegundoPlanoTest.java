@@ -44,10 +44,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * BE-25 (RF-004, RNF-001): o resumo é gerado em segundo plano, um por vez, com a fila de verdade. A IA
- * simulada fica presa até o teste soltá-la, como um modelo que demora a responder.
- */
 @TestPropertySource(properties = "sigh.ia.fila-maxima-resumos=1")
 class ResumoEmSegundoPlanoTest extends TesteIntegracao {
 
@@ -130,7 +126,6 @@ class ResumoEmSegundoPlanoTest extends TesteIntegracao {
 
 	@Test
 	void resumosPedidosAoMesmoTempoSaoGeradosUmPorVezEFilaCheiaRecusaNaHora() throws Exception {
-		// Fila de 1: um em geração, um esperando, e o terceiro é recusado.
 		UUID primeiro = idDe(pedir(atendimentoComHistorico()).andExpect(status().isAccepted()));
 		esperar(() -> chamadas.get() == 1);
 		UUID segundo = idDe(pedir(atendimentoComHistorico()).andExpect(status().isAccepted()));
@@ -149,7 +144,6 @@ class ResumoEmSegundoPlanoTest extends TesteIntegracao {
 
 	@Test
 	void falhaDaIANoSegundoPlanoDeixaOResumoFalhoComAviso() throws Exception {
-		// doThrow: um when(...) aqui chamaria a IA simulada do @BeforeEach, que fica presa.
 		doThrow(new IAIndisponivelException("O serviço de IA não respondeu.")).when(clienteIA).resumirHistorico(anyString());
 
 		UUID resumoId = idDe(pedir(atendimentoComHistorico()).andExpect(status().isAccepted()));
@@ -161,7 +155,6 @@ class ResumoEmSegundoPlanoTest extends TesteIntegracao {
 				.andExpect(jsonPath("$.aviso").value(org.hamcrest.Matchers.containsString("não gerou")));
 	}
 
-	/** RF-009: o paciente restringe um registro enquanto o pedido espera na fila; o histórico não vai à IA. */
 	@Test
 	void restricaoFeitaComOPedidoNaFilaImpedeQueOHistoricoVaAIA() throws Exception {
 		UUID emGeracao = idDe(pedir(atendimentoComHistorico()).andExpect(status().isAccepted()));
@@ -179,7 +172,6 @@ class ResumoEmSegundoPlanoTest extends TesteIntegracao {
 		assertThat(chamadas).as("o histórico restrito não foi mandado à IA").hasValue(1);
 	}
 
-	/** Banco fora quando a IA responde: nem o texto nem a falha são gravados, mas o resumo não fica preso. */
 	@Test
 	void resumoQueNaoConseguiuGravarOResultadoApareceComoFalhoNaConsulta() throws Exception {
 		doThrow(new IllegalStateException("banco fora")).when(resumoHistoricoService).concluir(any(), anyString());
@@ -196,7 +188,6 @@ class ResumoEmSegundoPlanoTest extends TesteIntegracao {
 		assertThat(statusDo(resumoId)).isEqualTo(StatusResumo.FALHOU);
 	}
 
-	/** Outra instância deu o resumo como falho enquanto esta o gerava: o texto que chega depois é descartado. */
 	@Test
 	void textoQueChegaDepoisDeOResumoSerDadoComoFalhoEhDescartado() throws Exception {
 		UUID resumoId = idDe(pedir(atendimentoComHistorico()).andExpect(status().isAccepted()));
@@ -212,7 +203,6 @@ class ResumoEmSegundoPlanoTest extends TesteIntegracao {
 	@Test
 	void resumoQueEstavaNaFilaQuandoAAplicacaoParouViraFalhoAoSubir() {
 		UUID atendimentoId = atendimentoComHistorico();
-		// Pedido gravado, mas que nunca chegou à fila: é o que sobra de uma fila perdida quando a aplicação para.
 		UUID resumoId = resumoHistoricoService.solicitar(atendimentoId, medico).resumoId();
 		assertThat(statusDo(resumoId)).isEqualTo(StatusResumo.SOLICITADO);
 
@@ -263,7 +253,6 @@ class ResumoEmSegundoPlanoTest extends TesteIntegracao {
 		return resumoHistoricoIARepository.findById(resumoId).orElseThrow().getStatus();
 	}
 
-	/** Resumos do hospital deste teste com o status: os de outras classes de teste não interferem. */
 	private long doHospital(String status) {
 		return jdbc.queryForObject("select count(*) from resumo_historico_ia r join atendimento a on a.id = r.atendimento_id"
 				+ " where a.instituicao_id = ? and r.status = ?", Long.class, hospital.getId(), status);

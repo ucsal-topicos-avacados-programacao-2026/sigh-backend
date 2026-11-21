@@ -13,7 +13,6 @@ import java.util.UUID;
 
 public interface TriagemRepository extends JpaRepository<Triagem, UUID> {
 
-	/** A classificação de risco confirmada mais recente do atendimento (empate no horário: decide o id). */
 	Optional<Triagem> findFirstByAtendimentoIdAndCorConfirmadaIsNotNullOrderByConfirmadaEmDescIdDesc(UUID atendimentoId);
 
 	@Query(value = """
@@ -46,10 +45,6 @@ public interface TriagemRepository extends JpaRepository<Triagem, UUID> {
 			""")
 	Page<Triagem> buscarFila(UUID instituicaoId, Pageable paginacao);
 
-	/**
-	 * Atendimentos da instituição em aberto ou em triagem sem classificação confirmada (FE-06), do mais antigo
-	 * para o mais recente. Os que já têm classificação confirmada estão na fila (buscarFila).
-	 */
 	@Query("""
 			select a from Atendimento a
 			join fetch a.prontuario p
@@ -62,6 +57,5 @@ public interface TriagemRepository extends JpaRepository<Triagem, UUID> {
 			""")
 	List<Atendimento> aguardandoTriagem(UUID instituicaoId);
 
-	/** Triagens do atendimento registradas e ainda sem confirmação. */
 	List<Triagem> findByAtendimentoIdAndCorConfirmadaIsNull(UUID atendimentoId);
 }

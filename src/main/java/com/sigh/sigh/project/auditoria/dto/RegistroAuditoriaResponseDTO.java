@@ -17,7 +17,6 @@ public record RegistroAuditoriaResponseDTO(
 		boolean emergencia,
 		String justificativa) {
 
-	/** A partir do registro já carregado (com a justificativa decifrada) e com ator e instituição buscados. */
 	public static RegistroAuditoriaResponseDTO de(RegistroAuditoria registro) {
 		return new RegistroAuditoriaResponseDTO(registro.getId(),
 				registro.getProntuario() == null ? null : registro.getProntuario().getId(), registro.getAtor().getNome(),

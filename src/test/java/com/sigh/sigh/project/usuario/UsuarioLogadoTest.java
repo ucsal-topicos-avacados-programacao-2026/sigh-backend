@@ -22,7 +22,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** FE-02: o front-end sabe quem está logado e em que instituições ele pode operar, com que perfis. */
 class UsuarioLogadoTest extends TesteIntegracao {
 
 	@Autowired
@@ -36,11 +35,9 @@ class UsuarioLogadoTest extends TesteIntegracao {
 
 	@Test
 	void profissionalVeOsVinculosAtivosEmOrdemAlfabeticaComOsPerfisQueEleTem() throws Exception {
-		// Criadas fora da ordem; "Ébano" testa a ordem do português (comparando bytes, viria depois de "Zona").
 		Instituicao zona = instituicao("Hospital Zona");
 		Instituicao ebano = instituicao("Hospital Ébano");
 		Instituicao ana = instituicao("Hospital Ana");
-		// Seis instituições na resposta: sem a ordenação, a chance de a ordem sair certa por acaso é de 1 em 720.
 		Instituicao delta = instituicao("Hospital Delta");
 		Instituicao bravo = instituicao("Hospital Bravo");
 		Instituicao carmo = instituicao("Hospital Carmo");
@@ -57,15 +54,11 @@ class UsuarioLogadoTest extends TesteIntegracao {
 		vinculo(medico, delta, Perfil.MEDICO, agora.minusDays(5), null);
 		vinculo(medico, bravo, Perfil.MEDICO, agora.minusDays(5), null);
 		vinculo(medico, carmo, Perfil.MEDICO, agora.minusDays(5), null);
-		// Começa exatamente agora: já vale.
 		vinculo(medico, ana, Perfil.MEDICO, agora, null);
-		// No Ébano, um segundo vínculo como enfermeiro: o usuário não tem esse perfil, então ele não aparece.
 		vinculo(medico, ebano, Perfil.ENFERMEIRO, agora.minusDays(5), null);
-		// Só com perfil que o usuário não tem: a instituição nem aparece.
 		vinculo(medico, soEnfermagem, Perfil.ENFERMEIRO, agora.minusDays(5), null);
 		vinculo(medico, encerrado, Perfil.MEDICO, agora.minusYears(1), agora.minusDays(1));
 		vinculo(medico, futuro, Perfil.MEDICO, agora.plusDays(1), null);
-		// Termina exatamente agora: já não vale.
 		vinculo(medico, terminaAgora, Perfil.MEDICO, agora.minusDays(5), agora);
 
 		mvc.perform(get("/usuarios/eu").with(user(login).roles("MEDICO")))

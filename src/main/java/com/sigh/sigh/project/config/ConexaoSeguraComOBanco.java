@@ -15,12 +15,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Com {@code sigh.banco.exigir-tls} (ligado no perfil tls), a aplicação só sobe se a conexão com o
- * banco usar TLS e conferir o certificado e o nome do servidor ({@code sslmode=verify-full}), RNF-004.
- * Confere logo que a fonte de dados é criada, antes de o Flyway ou o JPA usarem a conexão: a URL tem
- * de pedir verify-full e a sessão aberta tem de estar cifrada ({@code pg_stat_ssl}).
- */
 @Component
 public class ConexaoSeguraComOBanco implements BeanPostProcessor {
 
@@ -65,10 +59,6 @@ public class ConexaoSeguraComOBanco implements BeanPostProcessor {
 		}
 	}
 
-	/**
-	 * A URL tem exatamente um sslmode, e ele é verify-full, e não troca a fábrica de conexões TLS nem a
-	 * verificação do nome do servidor (que poderiam desligar a conferência do certificado).
-	 */
 	static boolean pedeVerificacaoCompleta(String url) {
 		if (FABRICA_OU_VERIFICADOR.matcher(url).find()) {
 			return false;

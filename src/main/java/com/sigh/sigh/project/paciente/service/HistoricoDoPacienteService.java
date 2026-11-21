@@ -21,10 +21,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/**
- * O paciente ou representante consulta o prontuário inteiro (caso de uso U1), com a marcação do que
- * está restrito, para decidir o que restringir ou liberar (RF-009).
- */
 @Service
 @RequiredArgsConstructor
 public class HistoricoDoPacienteService {
@@ -37,7 +33,6 @@ public class HistoricoDoPacienteService {
 
 	static final String FINALIDADE_REPRESENTANTE = "Consulta do histórico pelo representante legal";
 
-	/** A leitura pelo representante legal fica na auditoria (RF-008); a do próprio titular, não. */
 	@Transactional
 	public List<RegistroDoHistoricoDTO> consultar(UUID pacienteId, String login) {
 		Paciente paciente = titularidadeService.pacienteGerenciado(login, pacienteId);

@@ -100,7 +100,6 @@ class AutenticacaoIntegracaoTest {
 				.andReturn().getResponse().getContentAsString();
 
 		consultarFila(tokenDeAcesso, hospital).andExpect(status().isOk());
-		// BE-13: com o segundo fator validado, outra instituição continua fechada sem vínculo.
 		consultarFila(tokenDeAcesso, UUID.randomUUID()).andExpect(status().isForbidden());
 		mockMvc.perform(get("/leitos").header(HttpHeaders.AUTHORIZATION, bearer(tokenDeAcesso)))
 				.andExpect(status().isForbidden());
@@ -162,7 +161,6 @@ class AutenticacaoIntegracaoTest {
 		return new DefaultCodeGenerator().generate(segredo, intervaloAtual);
 	}
 
-	/** Vínculo ativo com uma instituição nova (BE-13); devolve o id da instituição. */
 	private UUID vincular(Usuario usuario, Perfil perfil) {
 		Instituicao instituicao = new Instituicao();
 		instituicao.setNome("Hospital Fictício");

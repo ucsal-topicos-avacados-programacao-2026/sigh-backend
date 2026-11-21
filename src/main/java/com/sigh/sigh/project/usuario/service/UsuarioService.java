@@ -37,16 +37,10 @@ public class UsuarioService {
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado."));
 	}
 
-	/** Ordem do seletor do front: nome da instituição com as regras do português, e o id para desempatar. */
 	private static final Comparator<UsuarioLogadoDTO.VinculoAtivo> ORDEM_DOS_VINCULOS = Comparator
 			.comparing(UsuarioLogadoDTO.VinculoAtivo::instituicaoNome, Collator.getInstance(Locale.of("pt", "BR")))
 			.thenComparing(UsuarioLogadoDTO.VinculoAtivo::instituicaoId);
 
-	/**
-	 * Quem está logado: nome, perfis e vínculos ativos, com os perfis de cada instituição juntos (dois vínculos
-	 * na mesma instituição viram um). Cada vínculo só traz os perfis que o usuário tem: operar exige os dois (o
-	 * perfil, no token, e o vínculo que o habilita na instituição).
-	 */
 	@Transactional(readOnly = true)
 	public UsuarioLogadoDTO logado(String login) {
 		Usuario usuario = buscarPorLogin(login);

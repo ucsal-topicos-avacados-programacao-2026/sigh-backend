@@ -22,7 +22,6 @@ import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
 
-/** A Recepção dá acesso ao cadastro: conta do paciente e representante legal (RF-002, RF-009). */
 @RestController
 @RequestMapping("/api/pacientes/{pacienteId}")
 @PreAuthorize("hasRole('RECEPCAO')")

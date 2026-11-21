@@ -30,7 +30,6 @@ public class ConsultaAuditoriaService {
 		return registroAuditoriaRepository.buscarAcessosDoPaciente(loginPaciente, paginacao);
 	}
 
-	/** Acessos ao prontuário, para o titular ou o representante legal vigente (RF-008, RF-009). */
 	@Transactional(readOnly = true)
 	public Page<AcessoDoPacienteDTO> consultarAcessosDoPaciente(UUID pacienteId, String login, Pageable paginacao) {
 		Paciente paciente = titularidadeService.pacienteGerenciado(login, pacienteId);
@@ -48,7 +47,6 @@ public class ConsultaAuditoriaService {
 				paginacao);
 	}
 
-	/** Acessos de emergência que o auditor ainda precisa analisar (BE-18). */
 	@Transactional(readOnly = true)
 	public Page<RegistroAuditoriaResponseDTO> consultarEmergenciasPendentes(Pageable paginacao) {
 		return registroAuditoriaRepository.buscarEmergenciasSemAnalise(paginacao);

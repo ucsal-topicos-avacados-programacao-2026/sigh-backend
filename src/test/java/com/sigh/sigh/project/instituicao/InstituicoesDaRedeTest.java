@@ -21,10 +21,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * FE-05, FE-04 e FE-09: o paciente escolhe a quem liberar uma informação restrita (RF-009), o administrativo escolhe o
- * destino de uma transferência (RF-006), e o auditor/gestor escolhe o hospital do painel, entre as credenciadas.
- */
 class InstituicoesDaRedeTest extends TesteIntegracao {
 
 	@Autowired
@@ -32,12 +28,10 @@ class InstituicoesDaRedeTest extends TesteIntegracao {
 
 	@Test
 	void pacienteVeSoAsCredenciadasEmOrdemDoPortuguesComIdENome() throws Exception {
-		// Prefixo próprio: o banco dos testes tem instituições de outros casos, que ficam de fora da conferência.
 		String grupo = "Rede " + UUID.randomUUID().toString().substring(0, 8);
 		Instituicao zona = instituicao(grupo + " Zona", true);
 		Instituicao ebano = instituicao(grupo + " Ébano", true);
 		Instituicao ana = instituicao(grupo + " Ana", true);
-		// Seis com o mesmo nome: sem o desempate pelo id, a ordem do banco só bate por acaso (1 em 720).
 		List<Instituicao> iguais = Stream.generate(() -> instituicao(grupo + " Igual", true)).limit(6).toList();
 		Instituicao descredenciada = instituicao(grupo + " Bravo", false);
 
@@ -48,7 +42,6 @@ class InstituicoesDaRedeTest extends TesteIntegracao {
 		List<Map<String, Object>> doGrupo = JsonPath.<List<Map<String, Object>>>read(corpo, "$[*]").stream()
 				.filter(item -> String.valueOf(item.get("nome")).startsWith(grupo))
 				.toList();
-		// Mesmo nome: o id desempata, na ordem do UUID.
 		List<String> esperado = new ArrayList<>(List.of(ana.getId().toString(), ebano.getId().toString()));
 		iguais.stream().map(Instituicao::getId).sorted(Comparator.naturalOrder()).map(UUID::toString).forEach(esperado::add);
 		esperado.add(zona.getId().toString());

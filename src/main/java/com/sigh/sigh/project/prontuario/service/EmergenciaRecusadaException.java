@@ -4,10 +4,6 @@ import com.sigh.sigh.project.comum.erro.RegraNegocioException;
 
 import java.io.Serial;
 
-/**
- * Acesso de emergência recusado por um dos controles contra abuso (BE-18, BE-24). O motivo curto e
- * fixo é o que vai para a auditoria (imutável); a mensagem é a que o profissional lê.
- */
 class EmergenciaRecusadaException extends RegraNegocioException {
 
 	@Serial

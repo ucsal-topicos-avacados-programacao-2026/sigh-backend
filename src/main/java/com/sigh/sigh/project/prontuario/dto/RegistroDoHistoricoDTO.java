@@ -7,7 +7,6 @@ import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.UUID;
 
-/** Registro clínico como aparece num histórico, com a instituição de origem e se está restrito pelo paciente. */
 public record RegistroDoHistoricoDTO(
 		UUID id,
 		TipoRegistro tipo,

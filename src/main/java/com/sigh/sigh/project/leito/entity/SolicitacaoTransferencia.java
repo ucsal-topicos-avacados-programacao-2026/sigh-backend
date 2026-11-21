@@ -9,10 +9,6 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-/**
- * Pedido de transferência de uma internação para outra instituição da rede (RF-006, BE-21). Quem decide
- * é o administrativo do destino: aceita escolhendo um leito livre dele, ou recusa com motivo.
- */
 @Entity
 @Table(name = "solicitacao_transferencia")
 @Getter

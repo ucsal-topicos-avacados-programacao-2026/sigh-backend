@@ -20,10 +20,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.security.Principal;
 import java.util.UUID;
 
-/**
- * Transferência entre instituições da rede (RF-006, BE-21): o destino vê os pedidos recebidos e aceita
- * (escolhendo um leito livre dele) ou recusa; a origem pode cancelar enquanto estiver pendente.
- */
 @RestController
 @RequestMapping("/solicitacoes-transferencia")
 @PreAuthorize("hasRole('ADMINISTRATIVO')")
@@ -38,7 +34,6 @@ public class SolicitacaoTransferenciaController {
 		return new PagedModel<>(internacaoService.solicitacoesRecebidas(instituicaoId, usuario.getName(), paginacao));
 	}
 
-	/** A origem acompanha os pedidos que fez: pendentes, aceitos, recusados (com o motivo) e cancelados. */
 	@GetMapping("/enviadas")
 	public PagedModel<SolicitacaoTransferenciaResponseDTO> enviadas(@RequestParam UUID instituicaoId,
 			Pageable paginacao, Principal usuario) {

@@ -39,11 +39,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * BE-07: o paciente restringe informações sensíveis (RF-009), libera para uma instituição com
- * autorização adicional, e o profissional só vê o restrito em emergência, com justificativa
- * registrada antes da exibição (RF-010, RN-003). BE-14: a instituição vê o que ela mesma registrou.
- */
 class HistoricoComRestricaoTest extends TesteIntegracao {
 
 	private static final String JUSTIFICATIVA = "Paciente inconsciente com suspeita de overdose, risco iminente de morte";
@@ -77,7 +72,6 @@ class HistoricoComRestricaoTest extends TesteIntegracao {
 	private UUID asma;
 	private UUID depressao;
 
-	/** Paciente com consentimento amplo atendido em A e em B; A registrou asma e depressão. */
 	@BeforeEach
 	void prepararPaciente() throws Exception {
 		hospitalA = cenario.instituicao(true);
@@ -98,7 +92,6 @@ class HistoricoComRestricaoTest extends TesteIntegracao {
 				.andExpect(jsonPath("$.possuiInformacoesRestritas").value(false));
 	}
 
-	/** Critério de aceite: o restrito não aparece sem autorização, nem indiretamente pela triagem e pelo resumo por IA. */
 	@Test
 	void categoriaRestritaSomeDaConsultaDaTriagemEDoResumoPorIA() throws Exception {
 		restringirCategoria("saúde mental");
@@ -155,7 +148,6 @@ class HistoricoComRestricaoTest extends TesteIntegracao {
 				.andExpect(jsonPath("$.registros[*].id").value(containsInAnyOrder(asma.toString())));
 	}
 
-	/** Critério de aceite: acesso emergencial só com justificativa, e identificado no histórico de acessos. */
 	@Test
 	void emergenciaMostraORestritoDepoisDeRegistrarAJustificativa() throws Exception {
 		cenario.classificarRisco(atendimentoEmB, hospitalB, CorRisco.VERMELHO);
@@ -218,7 +210,6 @@ class HistoricoComRestricaoTest extends TesteIntegracao {
 				.andExpect(jsonPath("$[0].categoria").value("SAUDE mental"));
 	}
 
-	/** RF-009: o resumo por IA feito antes da restrição não continua mostrando o que ela esconde. */
 	@Test
 	void resumoGeradoAntesDaRestricaoFicaOcultoENaoPodeSerValidado() throws Exception {
 		String medicoB = cenario.profissional(hospitalB, Perfil.MEDICO);
@@ -253,7 +244,6 @@ class HistoricoComRestricaoTest extends TesteIntegracao {
 		assertThat(registroAuditoriaRepository.count()).isEqualTo(acessosAntes);
 	}
 
-	/** BE-14: sem consentimento amplo, cada instituição vê só o que ela mesma registrou. */
 	@Test
 	void semConsentimentoCadaInstituicaoVeOsProprioRegistros() throws Exception {
 		String cpf = Cenario.novoCpf();

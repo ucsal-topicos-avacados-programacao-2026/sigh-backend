@@ -8,12 +8,6 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Alerta local da cifragem (RNF-004): a saúde da aplicação ({@code /actuator/health}) fica DOWN quando
- * a última manutenção encontrou valor fora do formato atual (gravado fora da aplicação) ou quando há
- * tabela regravada esperando o VACUUM FULL (a versão antiga da linha ainda está nos arquivos). Mostra só
- * colunas, tabelas e contagens.
- */
 @Component("cifragem")
 public class SaudeDaCifragem implements HealthIndicator {
 

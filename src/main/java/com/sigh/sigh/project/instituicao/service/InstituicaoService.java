@@ -15,14 +15,12 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class InstituicaoService {
 
-	/** Ordem do português ("Ébano" antes de "Zona"); o id desempata nomes iguais. */
 	private static final Comparator<InstituicaoDaRedeDTO> ORDEM = Comparator
 			.comparing(InstituicaoDaRedeDTO::nome, Collator.getInstance(Locale.of("pt", "BR")))
 			.thenComparing(InstituicaoDaRedeDTO::id);
 
 	private final InstituicaoRepository instituicaoRepository;
 
-	/** Instituições credenciadas, as únicas que podem receber uma autorização adicional. */
 	@Transactional(readOnly = true)
 	public List<InstituicaoDaRedeDTO> credenciadas() {
 		return instituicaoRepository.findByCredenciadaTrue().stream()

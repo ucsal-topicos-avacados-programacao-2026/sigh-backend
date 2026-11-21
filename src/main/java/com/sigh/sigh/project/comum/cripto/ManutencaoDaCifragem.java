@@ -19,27 +19,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/**
- * Manutenção das colunas cifradas, feita direto no banco ao subir a aplicação, antes de o servidor
- * web aceitar requisições (RNF-004):
- * <ol>
- * <li>refaz o VACUUM FULL que ficou pendente se a aplicação caiu no meio da última execução;</li>
- * <li>na primeira execução depois desta versão, cifra no formato atual o que ainda está em claro (dados
- * anteriores à criptografia e os de demonstração, que entram por SQL) ou no formato antigo
- * {@code sigh:v1:}, e marca a migração como concluída;</li>
- * <li>regrava com a chave atual os valores de chaves anteriores, depois de uma troca de chave;</li>
- * <li>depois da migração, não cifra mais valor em claro: conta e registra no log cada coluna com valor
- * fora do formato atual, que só pode ter sido gravado fora da aplicação. A leitura desses valores é
- * recusada ({@link CifragemDasEntidades}).</li>
- * </ol>
- *
- * <p>Toda tabela regravada passa por VACUUM FULL com ANALYZE, seguido de VACUUM FULL das estatísticas
- * (pg_statistic): o UPDATE deixa a versão antiga da linha (em claro ou com a chave antiga) nos arquivos do
- * banco, as estatísticas guardam amostras dos valores, e o backup físico copiaria esses arquivos. A tabela entra
- * na fila de VACUUM na mesma transação que a regrava, então uma queda no meio não deixa passar. O log
- * informa só contagens e colunas, nunca o conteúdo. Uma trava do PostgreSQL impede duas instâncias de
- * rodarem isto ao mesmo tempo.
- */
 @Component
 public class ManutencaoDaCifragem implements SmartInitializingSingleton {
 
@@ -55,7 +34,6 @@ public class ManutencaoDaCifragem implements SmartInitializingSingleton {
 	private final Clock clock;
 	private volatile Map<String, Integer> foraDoFormatoPorColuna = Map.of();
 
-	/** Quantos valores foram cifrados (legado), regravados (chave antiga) e quantos ficaram ilegíveis. */
 	public record Resultado(int cifrados, int regravados, int foraDoFormato) {
 	}
 
@@ -74,7 +52,6 @@ public class ManutencaoDaCifragem implements SmartInitializingSingleton {
 		this.clock = clock;
 	}
 
-	/** Colunas com valor fora do formato atual na última execução, e quantos (alimenta a saúde da aplicação). */
 	public Map<String, Integer> foraDoFormatoPorColuna() {
 		return foraDoFormatoPorColuna;
 	}
@@ -131,7 +108,6 @@ public class ManutencaoDaCifragem implements SmartInitializingSingleton {
 		return new Resultado(cifrados, regravados, foraDoFormato);
 	}
 
-	/** Colunas que podem ser regravadas: todas menos a da auditoria, que é imutável (RN-006). */
 	private static List<CamposCifrados.Campo> regravaveis() {
 		return CamposCifrados.daAplicacao().stream().filter(campo -> !campo.legadoImutavel()).toList();
 	}
@@ -154,10 +130,6 @@ public class ManutencaoDaCifragem implements SmartInitializingSingleton {
 		}
 	}
 
-	/**
-	 * Percorre, em lotes e em ordem de id, as linhas da coluna que atendem à condição e regrava as que a
-	 * conversão aceitar. As que ela recusa ficam como estão e não voltam no lote seguinte.
-	 */
 	private int percorrer(CamposCifrados.Campo campo, String condicao, String parametro, Conversao conversao) {
 		int regravados = 0;
 		UUID ultimo = null;
@@ -197,11 +169,6 @@ public class ManutencaoDaCifragem implements SmartInitializingSingleton {
 				+ " for update";
 	}
 
-	/**
-	 * Registra no log o que sobrou fora do formato atual ou com chave antiga, e devolve quantos valores
-	 * estão fora do formato. Na coluna imutável da auditoria, só as linhas da lista de legado podem estar
-	 * fora; lá a chave antiga não é contada, porque a linha não pode ser regravada.
-	 */
 	private int conferir(CamposCifrados.Campo campo) {
 		String coluna = "t." + campo.coluna();
 		String foraDaLista = campo.legadoImutavel()
@@ -222,18 +189,6 @@ public class ManutencaoDaCifragem implements SmartInitializingSingleton {
 		return fora;
 	}
 
-	/**
-	 * VACUUM FULL das tabelas na fila. Só aceita tabelas que têm coluna cifrada: o nome vem do banco e
-	 * entra no comando. A tabela só sai da fila quando o VACUUM pôde mesmo limpar:
-	 * <ul>
-	 * <li>o usuário do banco precisa ser dono dela e poder fazer a manutenção das estatísticas, pg_statistic
-	 * (papel pg_maintain); senão o PostgreSQL só avisa e não faz nada;</li>
-	 * <li>nenhuma outra sessão pode segurar um retrato antigo do banco (senão as versões antigas que ela
-	 * ainda enxerga são copiadas para a tabela nova);</li>
-	 * <li>o lock exclusivo tem tempo limite, para não travar a aplicação que estiver atendendo.</li>
-	 * </ul>
-	 * O que não pôde ser feito fica na fila para a próxima inicialização, com aviso no log.
-	 */
 	private void refazerVacuumPendente() {
 		Set<String> conhecidas = regravaveis().stream().map(CamposCifrados.Campo::tabela).collect(Collectors.toSet());
 		for (String tabela : jdbc.queryForList("select tabela from cifragem_vacuum_pendente order by tabela", String.class)) {
@@ -266,7 +221,6 @@ public class ManutencaoDaCifragem implements SmartInitializingSingleton {
 		}
 	}
 
-	/** Espera um pouco por sessões que ainda seguram um retrato antigo (transação aberta, slot de replicação). */
 	private boolean semRetratoAntigo() {
 		for (int tentativa = 0; tentativa < TENTATIVAS_DE_VACUUM; tentativa++) {
 			Integer outras = jdbc.queryForObject("""
@@ -292,8 +246,6 @@ public class ManutencaoDaCifragem implements SmartInitializingSingleton {
 			try (Statement comando = conexao.createStatement()) {
 				comando.execute("set lock_timeout = '30s'");
 				try {
-					// ANALYZE junto: as estatísticas da coluna (pg_statistic) guardam amostras dos valores, que
-					// estavam em claro; o VACUUM FULL do catálogo some com a versão antiga delas.
 					comando.execute("vacuum (full, analyze) " + tabela);
 					comando.execute("vacuum full pg_statistic");
 					return true;

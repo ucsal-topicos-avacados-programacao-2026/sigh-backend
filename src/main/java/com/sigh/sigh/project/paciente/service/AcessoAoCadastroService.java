@@ -28,11 +28,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * A Recepção liga a conta de acesso ao cadastro do paciente e registra o representante legal
- * (RF-002, RF-009). Ele precisa de vínculo ativo numa instituição que já atendeu o paciente: quem não
- * tem relação com o paciente não consegue dar a terceiros acesso aos dados dele.
- */
 @Service
 @RequiredArgsConstructor
 public class AcessoAoCadastroService {
@@ -63,7 +58,6 @@ public class AcessoAoCadastroService {
 			throw new RegraNegocioException(CONTA_INVALIDA);
 		}
 		paciente.setConta(conta);
-		// conta_id é UNIQUE no banco: dois vínculos simultâneos da mesma conta resultam em 409.
 		pacienteRepository.saveAndFlush(paciente);
 		auditar(paciente, instituicaoId, loginAdministrativo, FINALIDADE_CONTA);
 	}
@@ -122,7 +116,6 @@ public class AcessoAoCadastroService {
 		return RepresentacaoResponse.de(representacao, agora);
 	}
 
-	/** Vínculo de recepção ativo e paciente já atendido pela instituição; senão, 403 sem dizer se ele existe. */
 	private Paciente pacienteAtendidoPela(UUID instituicaoId, UUID pacienteId, String loginAdministrativo) {
 		vinculoService.exigirVinculoAtivo(loginAdministrativo, instituicaoId, Perfil.RECEPCAO);
 		if (!atendimentoRepository.existsByProntuarioPacienteIdAndInstituicaoId(pacienteId, instituicaoId)) {
@@ -131,10 +124,6 @@ public class AcessoAoCadastroService {
 		return pacienteRepository.findById(pacienteId).orElseThrow(() -> new AccessDeniedException(SEM_RELACAO));
 	}
 
-	/**
-	 * Conta com perfil Paciente que não seja a do próprio recepcionista. Login inexistente, perfil
-	 * errado e conta já usada dão a mesma resposta, para não revelar quais logins existem.
-	 */
 	private Usuario contaDePaciente(String login, String loginAdministrativo) {
 		String informado = login.strip();
 		if (informado.equals(loginAdministrativo)) {
@@ -148,7 +137,6 @@ public class AcessoAoCadastroService {
 		return usuario;
 	}
 
-	/** Dar acesso ao prontuário a alguém fica na auditoria imutável (RN-006), com quem fez e onde. */
 	private void auditar(Paciente paciente, UUID instituicaoId, String loginAdministrativo, String finalidade) {
 		UUID prontuarioId = prontuarioRepository.findByPacienteId(paciente.getId())
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Prontuário não encontrado.")).getId();
@@ -156,7 +144,6 @@ public class AcessoAoCadastroService {
 				Perfil.RECEPCAO, instituicaoId, finalidade, false, null, Set.of()));
 	}
 
-	/** Hora atual na mesma precisão do PostgreSQL (microssegundos). */
 	private LocalDateTime agora() {
 		return LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
 	}

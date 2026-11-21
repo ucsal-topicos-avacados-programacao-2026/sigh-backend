@@ -13,11 +13,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.RejectedExecutionException;
 
-/**
- * Ao subir, pede ao serviço de IA uma resposta mínima, para ele carregar o modelo antes do primeiro pedido
- * de verdade ({@code sigh.ia.aquecer-ao-subir}). Vai pela fila dos resumos, então um resumo pedido logo
- * depois espera o modelo carregar em vez de disputar com o carregamento. Uma falha só fica no log.
- */
 @Component
 @RequiredArgsConstructor
 public class AquecimentoDaIA {

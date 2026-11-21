@@ -115,7 +115,6 @@ class ResumoHistoricoServiceTest {
 		assertThat(resumo.getTexto()).isNull();
 	}
 
-	/** Conferido antes de mandar o histórico à IA: na fila, o médico pode perder o vínculo ou a fonte, a visibilidade. */
 	@Test
 	void continuaAutorizadoSoComVinculoEFontesVisiveis() {
 		ResumoHistoricoIA resumo = resumoComStatus(StatusResumo.SOLICITADO);
@@ -128,7 +127,6 @@ class ResumoHistoricoServiceTest {
 		fontesVisiveis(resumo, false);
 		assertThat(resumoHistoricoService.continuaAutorizado(resumo.getId())).as("fonte restrita na fila").isFalse();
 
-		// Sem vínculo, nem chega a conferir as fontes.
 		doThrow(new AccessDeniedException("sem vínculo")).when(vinculoService)
 				.exigirVinculoAtivo(eq(LOGIN_MEDICO), any(), any());
 		assertThat(resumoHistoricoService.continuaAutorizado(resumo.getId())).as("vínculo perdido na fila").isFalse();
@@ -147,11 +145,6 @@ class ResumoHistoricoServiceTest {
 		verify(registroAuditoriaService, never()).registrarAcesso(any());
 	}
 
-	/**
-	 * A tarefa grava o resultado e só depois sai da fila: a consulta pergunta à fila antes de ler o resumo. Na
-	 * ordem inversa, ela leria o resumo em geração, a tarefa gravaria e sairia da fila, e a consulta o daria como
-	 * falho, apagando o texto.
-	 */
 	@Test
 	void consultaPerguntaAFilaAntesDeLerOResumo() {
 		ResumoHistoricoIA resumo = resumoComStatus(StatusResumo.SOLICITADO);
@@ -164,7 +157,6 @@ class ResumoHistoricoServiceTest {
 		ordem.verify(resumoHistoricoIARepository).findById(resumo.getId());
 	}
 
-	/** Mesmo que a geração termine antes da resposta do pedido, o texto só sai na consulta, que é auditada. */
 	@Test
 	void respostaDoPedidoNuncaTrazOTexto() {
 		ResumoHistoricoIA resumo = resumoComStatus(StatusResumo.GERADO);
@@ -201,7 +193,6 @@ class ResumoHistoricoServiceTest {
 		assertThat(resumo.getStatus()).isEqualTo(StatusResumo.FALHOU);
 	}
 
-	/** RF-009: resumo feito antes de uma restrição não mostra mais o texto nem pode ser validado. */
 	@Test
 	void resumoComFonteQueFicouRestritaFicaOcultoENaoEhValidado() {
 		ResumoHistoricoIA resumo = resumoComStatus(StatusResumo.GERADO);
