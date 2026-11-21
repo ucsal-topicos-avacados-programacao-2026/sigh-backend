@@ -105,6 +105,17 @@ class UsuarioLogadoTest extends TesteIntegracao {
 	}
 
 	@Test
+	void recepcaoVeOsPropriosVinculos() throws Exception {
+		Instituicao hospital = cenario.instituicao(true);
+		String recepcao = cenario.recepcao(hospital);
+
+		mvc.perform(get("/usuarios/eu").with(user(recepcao).roles("RECEPCAO")))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.perfis").value(containsInAnyOrder("RECEPCAO")))
+				.andExpect(jsonPath("$.vinculos[0].perfis").value(containsInAnyOrder("RECEPCAO")));
+	}
+
+	@Test
 	void semLoginNaoHaDado() throws Exception {
 		mvc.perform(get("/usuarios/eu")).andExpect(status().isUnauthorized());
 	}

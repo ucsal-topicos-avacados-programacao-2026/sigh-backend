@@ -17,6 +17,7 @@ import com.sigh.sigh.project.prontuario.entity.Prontuario;
 import com.sigh.sigh.project.prontuario.entity.StatusAtendimento;
 import com.sigh.sigh.project.prontuario.repository.AtendimentoRepository;
 import com.sigh.sigh.project.prontuario.repository.ProntuarioRepository;
+import com.sigh.sigh.project.triagem.service.TriagemService;
 import com.sigh.sigh.project.usuario.entity.Perfil;
 import com.sigh.sigh.project.usuario.repository.VinculoInstitucionalRepository;
 import org.springframework.security.access.AccessDeniedException;
@@ -33,7 +34,7 @@ import java.util.UUID;
 
 /**
  * Cadastro único de paciente por CPF na rede (RF-001, RN-004).
- * Operações do perfil Administrativo, sempre no contexto de uma instituição à qual ele está vinculado.
+ * Operações do perfil Recepção, sempre no contexto de uma instituição à qual ele está vinculado.
  */
 @Service
 public class AdmissaoPacienteService {
@@ -44,17 +45,19 @@ public class AdmissaoPacienteService {
 	private final InstituicaoRepository instituicaoRepository;
 	private final VinculoInstitucionalRepository vinculoRepository;
 	private final ConsentimentoService consentimentoService;
+	private final TriagemService triagemService;
 	private final Clock clock;
 
 	public AdmissaoPacienteService(PacienteRepository pacienteRepository, ProntuarioRepository prontuarioRepository,
 			AtendimentoRepository atendimentoRepository, InstituicaoRepository instituicaoRepository,
-			VinculoInstitucionalRepository vinculoRepository, ConsentimentoService consentimentoService, Clock clock) {
+			VinculoInstitucionalRepository vinculoRepository, ConsentimentoService consentimentoService, TriagemService triagemService, Clock clock) {
 		this.pacienteRepository = pacienteRepository;
 		this.prontuarioRepository = prontuarioRepository;
 		this.atendimentoRepository = atendimentoRepository;
 		this.instituicaoRepository = instituicaoRepository;
 		this.vinculoRepository = vinculoRepository;
 		this.consentimentoService = consentimentoService;
+		this.triagemService = triagemService;
 		this.clock = clock;
 	}
 
@@ -100,20 +103,22 @@ public class AdmissaoPacienteService {
 		atendimento.setMotivo(requisicao.motivo().strip());
 		atendimento.setStatus(StatusAtendimento.ABERTO);
 		atendimentoRepository.save(atendimento);
+		// O que o paciente sente já vira a triagem, e a IA sugere a cor em segundo plano depois da gravação.
+		triagemService.abrirNaAdmissao(atendimento, login);
 
 		return new AdmissaoResponse(paciente.getId(), prontuario.getId(), atendimento.getId(), existente.isEmpty());
 	}
 
 	/**
-	 * O usuário precisa ter vínculo ativo com a instituição e o perfil Administrativo habilitado nela.
+	 * O usuário precisa ter vínculo ativo com a instituição e o perfil Recepção habilitado nela.
 	 * A checagem vem antes de qualquer consulta ao paciente, para não revelar dados a quem não pode vê-los.
 	 */
 	private Instituicao instituicaoAutorizada(String login, UUID instituicaoId, LocalDateTime agora) {
-		if (!vinculoRepository.existeVinculoAtivo(login, instituicaoId, Perfil.ADMINISTRATIVO, agora)) {
-			throw new AccessDeniedException("Sem vínculo administrativo ativo com a instituição.");
+		if (!vinculoRepository.existeVinculoAtivo(login, instituicaoId, Perfil.RECEPCAO, agora)) {
+			throw new AccessDeniedException("Sem vínculo de recepção ativo com a instituição.");
 		}
 		Instituicao instituicao = instituicaoRepository.findById(instituicaoId)
-				.orElseThrow(() -> new AccessDeniedException("Sem vínculo administrativo ativo com a instituição."));
+				.orElseThrow(() -> new AccessDeniedException("Sem vínculo de recepção ativo com a instituição."));
 		if (!instituicao.isCredenciada()) {
 			throw new RegraNegocioException("A instituição não está credenciada na rede.");
 		}

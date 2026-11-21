@@ -51,7 +51,7 @@ OLLAMA_KEEP_ALIVE=-1 ollama serve
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=demonstracao
 ```
 
-A API fica em `http://localhost:8080`. O perfil `demonstracao` **apaga e recria o banco `sigh_demonstracao` toda vez que sobe** e carrega três hospitais, 17 pacientes fictícios com histórico clínico, leitos, fila de triagem e os usuários `paciente.demo`, `enfermeiro.demo`, `medico.demo`, `administrativo.demo` e `auditor.demo`, todos com a senha de `SIGH_SENHA_DEMONSTRACAO`. Médico, enfermeiro e auditor cadastram o segundo fator (aplicativo autenticador) no primeiro acesso. Para rodar sem os dados de demonstração, suba sem o `-Dspring-boot.run.profiles` e com o banco `sigh` criado.
+A API fica em `http://localhost:8080`. O perfil `demonstracao` **apaga e recria o banco `sigh_demonstracao` toda vez que sobe** e carrega três hospitais, 17 pacientes fictícios com histórico clínico, leitos, fila de triagem e os usuários `paciente.demo`, `enfermeiro.demo`, `medico.demo`, `administrativo.demo`, `recepcao.demo` e `auditor.demo`, todos com a senha de `SIGH_SENHA_DEMONSTRACAO`. Médico, enfermeiro e auditor cadastram o segundo fator (aplicativo autenticador) no primeiro acesso. Para rodar sem os dados de demonstração, suba sem o `-Dspring-boot.run.profiles` e com o banco `sigh` criado.
 
 **6. Subir o front-end:** siga o README do [`sigh-frontend`](https://github.com/ucsal-topicos-avacados-programacao-2026/sigh-frontend).
 
@@ -149,6 +149,22 @@ OLLAMA_KEEP_ALIVE=-1 ollama serve
 ollama pull qwen3:8b   # uma vez
 ```
 
+## Recepção e pré-classificação por IA (RF-001, RF-003)
+
+A **Recepção** (perfil `RECEPCAO`, com vínculo na instituição e segundo fator) recebe o paciente: busca o CPF na rede, cadastra quem ainda não existe, registra o consentimento inicial, vincula conta e representante e abre o atendimento (`/api/pacientes/busca`, `/api/pacientes/admissoes`, `/api/pacientes/{pacienteId}/conta` e `/api/pacientes/{pacienteId}/representantes`). O Administrativo fica só com leitos, internações, transferências e altas. A recepção não mede sinais vitais: pergunta o que o paciente sente e informa em `motivo`.
+
+**O que a admissão faz além de abrir o atendimento:**
+- **Triagem aberta:** nasce uma triagem com o `motivo` como sintoma e sem sinais vitais, registrada em nome do recepcionista.
+- **IA em segundo plano:** depois que a admissão é gravada, a IA sugere a cor com o motivo e o histórico autorizado do paciente (consentimento e restrições, como na triagem). A admissão não espera por ela, e a IA atende um pedido por vez.
+- **Auditoria:** o acesso ao histórico fica registrado em nome do recepcionista, com a finalidade "Pré-classificação por IA na admissão". A recepção não vê histórico nem cor.
+- **Sem histórico ou sem consentimento:** a sugestão sai só pelo motivo, sem rebaixar a prioridade (RN-009).
+
+**O que o enfermeiro vê (`GET /triagens/aguardando`):** a triagem aberta na recepção, com a cor sugerida já preenchida e `sugestaoPreliminar: true` (dada sem sinais vitais). Ao registrar os sinais vitais com `PATCH /triagens/{id}/sinais-vitais`, a IA refaz a sugestão em segundo plano, e `situacaoSugestao` vai de `EM_ANDAMENTO` para `PRONTA`. Quem classifica continua sendo o enfermeiro: a cor só vale depois de `POST /triagens/{id}/confirmacao` (RN-001). Comparar `corSugerida` com `corConfirmada` mostra se ele aceitou ou alterou a sugestão.
+
+**Se a IA falhar ou demorar:** `situacaoSugestao` fica `INDISPONIVEL`, e a triagem segue pendente para o enfermeiro classificar sem sugestão. `POST /triagens/{id}/sugestao` continua disponível para pedir de novo.
+
+**Andamento para a recepção:** `GET /triagens/pre-classificacao?atendimentoId=&instituicaoId=` devolve só `situacao` (`EM_ANDAMENTO`, `PRONTA`, `INDISPONIVEL`), nunca a cor. Provado em `PreClassificacaoNaAdmissaoTest`.
+
 ## Integração com o front-end (FE-02)
 
 O front-end (`sigh-frontend`) roda em outra origem e chama a API direto, com o token no cabeçalho `Authorization`. Não há proxy no meio, que seria um intermediário lendo o tráfego (RNF-004).
@@ -189,7 +205,7 @@ Provado em `InternacoesDaInstituicaoTest` e, para o vínculo, no `VinculoEmTodaR
 
 Médico, enfermeiro e administrativo precisam de vínculo ativo com a instituição; sem ele, a resposta é 403 antes de procurar a instituição, para não revelar se ela existe. O Auditor/Gestor vê qualquer instituição da rede, como nos indicadores de auditoria (RF-011), e recebe 404 para uma que não existe. Provado em `PainelDaInstituicaoTest` e no `VinculoEmTodaRotaTest`.
 
-**Dados de demonstração:** o perfil `demonstracao` cria três hospitais (Público, Privado e Universitário) com leitos, fila por cor, internações e um pedido de transferência pendente, para o painel mostrar números diferentes em cada um. O médico tem vínculo nos três, o enfermeiro e o administrativo no Público e no Universitário. Os pacientes são fictícios.
+**Dados de demonstração:** o perfil `demonstracao` cria três hospitais (Público, Privado e Universitário) com leitos, fila por cor, internações e um pedido de transferência pendente, para o painel mostrar números diferentes em cada um. O médico tem vínculo nos três, o enfermeiro e o administrativo no Público e no Universitário. A recepção (`recepcao.demo`) tem vínculo nos três. Os pacientes que aguardam triagem já vêm com a pré-sugestão da IA gravada, e um deles com a IA "indisponível", para mostrar o caminho manual. Os pacientes são fictícios.
 
 ## Desempenho e carga (RNF-001, RNF-002)
 

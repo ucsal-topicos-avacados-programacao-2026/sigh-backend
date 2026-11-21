@@ -58,16 +58,16 @@ class ProtecaoDeDadosTest extends TesteIntegracao {
 	@Test
 	void fluxoDeAdmissaoNaoRegistraOCpfNoLog(CapturedOutput saida) throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
-		String admin = cenario.administrativo(hospital);
+		String admin = cenario.recepcao(hospital);
 		String cpf = Cenario.novoCpf();
 
 		for (int i = 0; i < 2; i++) {
-			mvc.perform(post("/api/pacientes/admissoes").with(user(admin).roles("ADMINISTRATIVO")).with(csrf())
+			mvc.perform(post("/api/pacientes/admissoes").with(user(admin).roles("RECEPCAO")).with(csrf())
 							.contentType(MediaType.APPLICATION_JSON)
 							.content(AdmissaoPacienteTest.novoCadastro(cpf, hospital.getId(), "AUTORIZADO")))
 					.andExpect(status().isCreated());
 		}
-		mvc.perform(post("/api/pacientes/busca").with(user(admin).roles("ADMINISTRATIVO")).with(csrf())
+		mvc.perform(post("/api/pacientes/busca").with(user(admin).roles("RECEPCAO")).with(csrf())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("{\"cpf\":\"%s\",\"instituicaoId\":\"%s\"}".formatted(cpf, hospital.getId())))
 				.andExpect(status().isOk());

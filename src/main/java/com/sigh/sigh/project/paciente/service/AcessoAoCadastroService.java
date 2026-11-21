@@ -29,7 +29,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * O Administrativo liga a conta de acesso ao cadastro do paciente e registra o representante legal
+ * A Recepção liga a conta de acesso ao cadastro do paciente e registra o representante legal
  * (RF-002, RF-009). Ele precisa de vínculo ativo numa instituição que já atendeu o paciente: quem não
  * tem relação com o paciente não consegue dar a terceiros acesso aos dados dele.
  */
@@ -122,9 +122,9 @@ public class AcessoAoCadastroService {
 		return RepresentacaoResponse.de(representacao, agora);
 	}
 
-	/** Vínculo administrativo ativo e paciente já atendido pela instituição; senão, 403 sem dizer se ele existe. */
+	/** Vínculo de recepção ativo e paciente já atendido pela instituição; senão, 403 sem dizer se ele existe. */
 	private Paciente pacienteAtendidoPela(UUID instituicaoId, UUID pacienteId, String loginAdministrativo) {
-		vinculoService.exigirVinculoAtivo(loginAdministrativo, instituicaoId, Perfil.ADMINISTRATIVO);
+		vinculoService.exigirVinculoAtivo(loginAdministrativo, instituicaoId, Perfil.RECEPCAO);
 		if (!atendimentoRepository.existsByProntuarioPacienteIdAndInstituicaoId(pacienteId, instituicaoId)) {
 			throw new AccessDeniedException(SEM_RELACAO);
 		}
@@ -132,7 +132,7 @@ public class AcessoAoCadastroService {
 	}
 
 	/**
-	 * Conta com perfil Paciente que não seja a do próprio administrativo. Login inexistente, perfil
+	 * Conta com perfil Paciente que não seja a do próprio recepcionista. Login inexistente, perfil
 	 * errado e conta já usada dão a mesma resposta, para não revelar quais logins existem.
 	 */
 	private Usuario contaDePaciente(String login, String loginAdministrativo) {
@@ -153,7 +153,7 @@ public class AcessoAoCadastroService {
 		UUID prontuarioId = prontuarioRepository.findByPacienteId(paciente.getId())
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Prontuário não encontrado.")).getId();
 		registroAuditoriaService.registrarAcesso(new AcessoProntuarioDTO(prontuarioId, loginAdministrativo,
-				Perfil.ADMINISTRATIVO, instituicaoId, finalidade, false, null, Set.of()));
+				Perfil.RECEPCAO, instituicaoId, finalidade, false, null, Set.of()));
 	}
 
 	/** Hora atual na mesma precisão do PostgreSQL (microssegundos). */

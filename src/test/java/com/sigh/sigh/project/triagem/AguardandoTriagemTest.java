@@ -55,25 +55,29 @@ class AguardandoTriagemTest extends TesteIntegracao {
 
 	@Test
 	void soQuemNaoTemClassificacaoConfirmadaComATriagemPendente() throws Exception {
-		UUID semTriagem = admitir(administrativoA, hospitalA, "Sem Triagem", "Dor de cabeça");
+		UUID semTriagem = admitir(hospitalA, "Sem Triagem", "Dor de cabeça");
 		relogio.avancar(Duration.ofMinutes(1));
-		UUID comPendente = admitir(administrativoA, hospitalA, "Triagem Começada", "Febre");
-		UUID pendente = registrarTriagem(comPendente, "Febre há dois dias");
+		UUID comPendente = admitir(hospitalA, "Triagem Começada", "Febre");
+		UUID pendente = UUID.fromString(jdbc.queryForObject("select cast(id as text) from triagem where atendimento_id = ?", String.class, comPendente));
 		relogio.avancar(Duration.ofMinutes(1));
-		UUID confirmado = admitir(administrativoA, hospitalA, "Já Confirmado", "Tosse");
+		UUID confirmado = admitir(hospitalA, "Já Confirmado", "Tosse");
 		confirmar(registrarTriagem(confirmado, "Tosse seca"), "VERDE");
-		UUID encerrado = admitir(administrativoA, hospitalA, "Já Encerrado", "Retorno");
+		UUID encerrado = admitir(hospitalA, "Já Encerrado", "Retorno");
 		jdbc.update("update atendimento set status = 'ENCERRADO' where id = ?", encerrado);
-		admitir(cenario.administrativo(hospitalB), hospitalB, "Outro Hospital", "Corte");
+		admitir(hospitalB, "Outro Hospital", "Corte");
 
 		List<Map<String, Object>> aguardando = aguardando(enfermeiroA);
 
 		assertThat(aguardando).extracting(a -> a.get("atendimentoId")).containsExactly(semTriagem.toString(), comPendente.toString());
 		assertThat(aguardando.get(0)).containsEntry("paciente", "Sem Triagem").containsEntry("motivo", "Dor de cabeça")
-				.containsEntry("triagemPendente", null).containsKey("chegadaEm");
+				.containsKey("chegadaEm");
+		@SuppressWarnings("unchecked")
+		Map<String, Object> daRecepcao = (Map<String, Object>) aguardando.get(0).get("triagemPendente");
+		assertThat(daRecepcao).containsEntry("sintomas", "Dor de cabeça").containsEntry("sinaisVitais", null)
+				.containsEntry("sugestaoPreliminar", true).containsEntry("corSugerida", null);
 		@SuppressWarnings("unchecked")
 		Map<String, Object> triagem = (Map<String, Object>) aguardando.get(1).get("triagemPendente");
-		assertThat(triagem).containsEntry("id", pendente.toString()).containsEntry("sintomas", "Febre há dois dias")
+		assertThat(triagem).containsEntry("id", pendente.toString()).containsEntry("sintomas", "Febre")
 				.containsEntry("corSugerida", null);
 
 		// Com a sugestão da IA registrada, ela vem junto.
@@ -85,7 +89,7 @@ class AguardandoTriagemTest extends TesteIntegracao {
 
 	@Test
 	void entreDuasTriagensPendentesValeAQueTemSugestao() throws Exception {
-		UUID atendimento = admitir(administrativoA, hospitalA, "Duas Triagens", "Falta de ar");
+		UUID atendimento = admitir(hospitalA, "Duas Triagens", "Falta de ar");
 		List<UUID> pendentes = new ArrayList<>();
 		for (int i = 0; i < 4; i++) {
 			pendentes.add(registrarTriagem(atendimento, "Registro " + i));
@@ -103,7 +107,7 @@ class AguardandoTriagemTest extends TesteIntegracao {
 	void porOrdemDeChegada() throws Exception {
 		List<String> chegadas = new ArrayList<>();
 		for (int i = 0; i < 5; i++) {
-			chegadas.add(admitir(administrativoA, hospitalA, "Chegada " + i, "Motivo").toString());
+			chegadas.add(admitir(hospitalA, "Chegada " + i, "Motivo").toString());
 			relogio.avancar(Duration.ofMinutes(1));
 		}
 		assertThat(aguardando(enfermeiroA)).extracting(a -> a.get("atendimentoId")).containsExactlyElementsOf(chegadas);
@@ -124,8 +128,8 @@ class AguardandoTriagemTest extends TesteIntegracao {
 		return JsonPath.read(corpo, "$[*]");
 	}
 
-	private UUID admitir(String administrativo, Instituicao hospital, String nome, String motivo) throws Exception {
-		return id(como(administrativo, "ADMINISTRATIVO", post("/api/pacientes/admissoes").content("""
+	private UUID admitir(Instituicao hospital, String nome, String motivo) throws Exception {
+		return id(como(cenario.recepcao(hospital), "RECEPCAO", post("/api/pacientes/admissoes").content("""
 				{"cpf":"%s","nome":"%s","dataNascimento":"1980-05-17","instituicaoId":"%s","motivo":"%s"}
 				""".formatted(Cenario.novoCpf(), nome, hospital.getId(), motivo))).andExpect(status().isCreated()), "$.atendimentoId");
 	}

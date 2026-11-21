@@ -57,7 +57,7 @@ class AtendimentosEmAndamentoTest extends TesteIntegracao {
 
 	@Test
 	void soOsEmAtendimentoDaInstituicaoComACorMaisRecenteEOMedico() throws Exception {
-		UUID comReclassificacao = admitir(administrativoA, hospitalA, "Reclassificado", "Febre alta");
+		UUID comReclassificacao = admitir(hospitalA, "Reclassificado", "Febre alta");
 		classificar(comReclassificacao, "VERDE");
 		relogio.avancar(Duration.ofMinutes(1));
 		classificar(comReclassificacao, "LARANJA");
@@ -65,17 +65,17 @@ class AtendimentosEmAndamentoTest extends TesteIntegracao {
 		relogio.avancar(Duration.ofMinutes(1));
 		String outroMedico = cenario.profissional(hospitalA, Perfil.MEDICO);
 		jdbc.update("update usuario set nome = 'Dr. Outro' where login = ?", outroMedico);
-		UUID semTriagem = admitir(administrativoA, hospitalA, "Sem Triagem", "Retorno");
+		UUID semTriagem = admitir(hospitalA, "Sem Triagem", "Retorno");
 		registrar(outroMedico, semTriagem);
 
-		UUID naFila = admitir(administrativoA, hospitalA, "Na Fila", "Tosse");
+		UUID naFila = admitir(hospitalA, "Na Fila", "Tosse");
 		classificar(naFila, "AMARELO");
-		UUID encerrado = admitir(administrativoA, hospitalA, "Encerrado", "Corte");
+		UUID encerrado = admitir(hospitalA, "Encerrado", "Corte");
 		registrar(medicoA, encerrado);
 		mvc.perform(post("/atendimentos/{id}/encerramento", encerrado).with(user(medicoA).roles("MEDICO")).with(csrf()))
 				.andExpect(status().isNoContent());
 		String medicoB = cenario.profissional(hospitalB, Perfil.MEDICO);
-		registrar(medicoB, admitir(cenario.administrativo(hospitalB), hospitalB, "Outro Hospital", "Dor"));
+		registrar(medicoB, admitir(hospitalB, "Outro Hospital", "Dor"));
 
 		List<Map<String, Object>> doMedicoA = lista(medicoA, "MEDICO");
 		assertThat(doMedicoA).extracting(a -> a.get("atendimentoId")).containsExactly(comReclassificacao.toString(), semTriagem.toString());
@@ -94,7 +94,7 @@ class AtendimentosEmAndamentoTest extends TesteIntegracao {
 		List<String> ordem = new ArrayList<>();
 		List<UUID> admitidos = new ArrayList<>();
 		for (int i = 0; i < 5; i++) {
-			admitidos.add(admitir(administrativoA, hospitalA, "Paciente " + i, "Motivo"));
+			admitidos.add(admitir(hospitalA, "Paciente " + i, "Motivo"));
 		}
 		// Começam na ordem inversa da chegada: a lista segue o início do atendimento, e não a chegada.
 		for (int i = 4; i >= 0; i--) {
@@ -119,8 +119,8 @@ class AtendimentosEmAndamentoTest extends TesteIntegracao {
 		return JsonPath.read(corpo, "$[*]");
 	}
 
-	private UUID admitir(String administrativo, Instituicao hospital, String nome, String motivo) throws Exception {
-		return id(como(administrativo, "ADMINISTRATIVO", post("/api/pacientes/admissoes").content("""
+	private UUID admitir(Instituicao hospital, String nome, String motivo) throws Exception {
+		return id(como(cenario.recepcao(hospital), "RECEPCAO", post("/api/pacientes/admissoes").content("""
 				{"cpf":"%s","nome":"%s","dataNascimento":"1980-05-17","instituicaoId":"%s","motivo":"%s"}
 				""".formatted(Cenario.novoCpf(), nome, hospital.getId(), motivo))).andExpect(status().isCreated()), "$.atendimentoId");
 	}
