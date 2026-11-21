@@ -2,6 +2,8 @@ package com.sigh.sigh.project.leito.service;
 
 import com.sigh.sigh.project.instituicao.entity.Instituicao;
 import com.sigh.sigh.project.instituicao.repository.InstituicaoRepository;
+import com.sigh.sigh.project.leito.dto.AtendimentoSemLeitoDTO;
+import com.sigh.sigh.project.leito.dto.InternacaoAtivaDTO;
 import com.sigh.sigh.project.leito.dto.ReferenciasDaSolicitacao;
 import com.sigh.sigh.project.leito.dto.SolicitacaoTransferenciaRequestDTO;
 import com.sigh.sigh.project.leito.dto.SolicitacaoTransferenciaResponseDTO;
@@ -36,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -52,6 +55,42 @@ public class InternacaoService {
 	private final SolicitacaoTransferenciaRepository solicitacaoRepository;
 	private final InstituicaoRepository instituicaoRepository;
 	private final UsuarioService usuarioService;
+
+	/**
+	 * Internações em andamento nos leitos da instituição (FE-04), com o que o administrativo precisa para
+	 * transferir ou dar alta. Exige vínculo administrativo ativo com a instituição antes de ler qualquer dado.
+	 */
+	@Transactional(readOnly = true)
+	public List<InternacaoAtivaDTO> internacoesAtivas(UUID instituicaoId, String login) {
+		vinculoService.exigirVinculoAtivo(login, instituicaoId, Perfil.ADMINISTRATIVO);
+		return ocupacaoLeitoRepository.atuaisDaInstituicao(instituicaoId).stream().map(ocupacao -> {
+			Internacao internacao = ocupacao.getInternacao();
+			Leito leito = ocupacao.getLeito();
+			List<InternacaoAtivaDTO.ResumoDeAltaDTO> resumos = registroClinicoRepository
+					.resumosDeAltaDesde(internacao.getProntuario().getId(), internacao.getAdmitidaEm()).stream()
+					.map(r -> new InternacaoAtivaDTO.ResumoDeAltaDTO(r.getId(), r.getCriadoEm(), r.getAutor().getNome()))
+					.toList();
+			UUID pendente = solicitacaoRepository.findByInternacaoIdAndStatus(internacao.getId(),
+					StatusSolicitacaoTransferencia.PENDENTE).stream().findFirst().map(SolicitacaoTransferencia::getId)
+					.orElse(null);
+			return new InternacaoAtivaDTO(internacao.getId(), internacao.getAtendimentoOrigem().getId(),
+					internacao.getProntuario().getPaciente().getNome(), leito.getId(), leito.getCodigo(), leito.getSetor(),
+					leito.getCategoria(), internacao.getAdmitidaEm(), resumos, pendente);
+		}).toList();
+	}
+
+	/**
+	 * Atendimentos em aberto da instituição cujo paciente não está internado (FE-04): de onde se escolhe quem
+	 * internar, e a fila de espera quando não há leito livre. Exige vínculo administrativo ativo com a instituição.
+	 */
+	@Transactional(readOnly = true)
+	public List<AtendimentoSemLeitoDTO> atendimentosSemLeito(UUID instituicaoId, String login) {
+		vinculoService.exigirVinculoAtivo(login, instituicaoId, Perfil.ADMINISTRATIVO);
+		return atendimentoRepository.abertosSemInternacao(instituicaoId).stream()
+				.map(a -> new AtendimentoSemLeitoDTO(a.getId(), a.getProntuario().getPaciente().getNome(), a.getChegadaEm(),
+						a.getStatus(), a.getMotivo()))
+				.toList();
+	}
 
 	@Transactional
 	public InternacaoResponseDTO internar(InternacaoRequestDTO dados, String login) {

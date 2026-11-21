@@ -1,6 +1,8 @@
 package com.sigh.sigh.project.leito.controller;
 
 import com.sigh.sigh.project.leito.dto.AltaRequestDTO;
+import com.sigh.sigh.project.leito.dto.AtendimentoSemLeitoDTO;
+import com.sigh.sigh.project.leito.dto.InternacaoAtivaDTO;
 import com.sigh.sigh.project.leito.dto.InternacaoRequestDTO;
 import com.sigh.sigh.project.leito.dto.InternacaoResponseDTO;
 import com.sigh.sigh.project.leito.dto.SolicitacaoTransferenciaRequestDTO;
@@ -11,14 +13,17 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.security.Principal;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -28,6 +33,18 @@ import java.util.UUID;
 public class InternacaoController {
 
 	private final InternacaoService internacaoService;
+
+	/** Internações em andamento nos leitos da instituição, para transferir ou dar alta (FE-04). */
+	@GetMapping
+	public List<InternacaoAtivaDTO> ativas(@RequestParam UUID instituicaoId, Principal usuario) {
+		return internacaoService.internacoesAtivas(instituicaoId, usuario.getName());
+	}
+
+	/** Atendimentos em aberto sem internação: quem pode ser internado, e a fila de espera sem leito livre (FE-04). */
+	@GetMapping("/atendimentos-sem-leito")
+	public List<AtendimentoSemLeitoDTO> atendimentosSemLeito(@RequestParam UUID instituicaoId, Principal usuario) {
+		return internacaoService.atendimentosSemLeito(instituicaoId, usuario.getName());
+	}
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)

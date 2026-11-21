@@ -76,6 +76,8 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 	private static final Map<String, String> SEM_VINCULO = Map.of(
 			"GET /leitos", "busca de leitos aberta à rede, para ver vagas em transferências; não traz dado de"
 					+ " paciente (BE-13)",
+			"GET /api/instituicoes", "lista de instituições credenciadas da rede (só id e nome), para escolher o"
+					+ " destino de uma transferência; não traz dado de paciente (FE-04)",
 			"GET /usuarios/eu", "dados do próprio usuário logado, inclusive os vínculos dele: é com isso que o"
 					+ " front-end sabe em que instituição ele pode operar; não traz dado de paciente (FE-02)");
 
@@ -136,6 +138,9 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 		casos.put("POST /internacoes/{internacaoId}/transferencia",
 				d -> post("/internacoes/{id}/transferencia", d.internacaoId())
 						.content("{\"leitoDestinoId\":\"%s\"}".formatted(d.leitoLivreId())));
+		casos.put("GET /internacoes", d -> get("/internacoes").param("instituicaoId", d.hospital().getId().toString()));
+		casos.put("GET /internacoes/atendimentos-sem-leito",
+				d -> get("/internacoes/atendimentos-sem-leito").param("instituicaoId", d.hospital().getId().toString()));
 		casos.put("POST /internacoes/{internacaoId}/alta", d -> post("/internacoes/{id}/alta", d.internacaoId())
 				.content("{\"resumoAltaId\":\"%s\"}".formatted(UUID.randomUUID())));
 		casos.put("POST /internacoes/{internacaoId}/solicitacoes-transferencia",
