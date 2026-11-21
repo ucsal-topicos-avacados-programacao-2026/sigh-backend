@@ -123,6 +123,8 @@ Provado em `InternacoesDaInstituicaoTest` e, para o vínculo, no `VinculoEmTodaR
 
 **Quem aguarda triagem (FE-06):** `GET /triagens/aguardando?instituicaoId=`, só para o enfermeiro com vínculo na instituição. Lista os atendimentos em aberto ou em triagem sem classificação de risco confirmada, por ordem de chegada, com a triagem começada e não confirmada, se houver (id, sintomas e a sugestão da IA). Quem já tem a classificação confirmada está em `GET /triagens/fila`. Provado em `AguardandoTriagemTest`.
 
+**Atendimentos em andamento (FE-07):** `GET /atendimentos/em-andamento?instituicaoId=`, para médico e enfermeiro com vínculo na instituição. O atendimento sai da fila de triagem quando o médico faz o primeiro registro; esta lista é por onde o médico volta ao paciente. Traz paciente, motivo, chegada, início do atendimento, a classificação de risco confirmada mais recente, o médico responsável e se ele é quem consulta, do que começou antes para o mais recente. Provado em `AtendimentosEmAndamentoTest`.
+
 ## Desempenho e carga (RNF-001, RNF-002)
 
 O relatório do teste de carga, da medição da IA, da inspeção da criptografia e do ensaio de restauração está em [`carga/README.md`](carga/README.md), com os scripts para reproduzir.
