@@ -113,7 +113,13 @@ O front-end (`sigh-frontend`) roda em outra origem e chama a API direto, com o t
 
 Os dois pontos estão provados em `UsuarioLogadoTest` e `CorsTest`.
 
-**Instituições da rede (FE-05):** `GET /api/instituicoes` devolve as instituições credenciadas, só com `id` e `nome`, na ordem do português. É a lista em que o paciente escolhe a quem liberar uma informação restrita (autorização adicional, RF-009), já que a API só aceita instituição credenciada. Só o perfil Paciente usa a rota; ela não traz dado de paciente nem de profissional. Provado em `InstituicoesDaRedeTest`.
+**Instituições da rede (FE-05):** `GET /api/instituicoes` devolve as instituições credenciadas, só com `id` e `nome`, na ordem do português. É a lista em que o paciente escolhe a quem liberar uma informação restrita (autorização adicional, RF-009), já que a API só aceita instituição credenciada. O administrativo usa a mesma lista para escolher o destino de uma transferência (FE-04). Só os perfis Paciente e Administrativo usam a rota, que não exige vínculo e não traz dado de paciente nem de profissional. Provado em `InstituicoesDaRedeTest`.
+
+**Leitos e internações (FE-04):** duas rotas de leitura para a tela do administrativo, que exigem vínculo administrativo ativo com a instituição:
+- `GET /internacoes?instituicaoId=`: internações em andamento nos leitos da instituição, pela ordem do código do leito. Cada uma traz o paciente, o leito, o atendimento de origem, o pedido de transferência pendente (se houver) e os resumos de alta feitos desde a admissão, só com id, data e autor, sem o texto clínico. É o que a tela usa para transferir e dar alta.
+- `GET /internacoes/atendimentos-sem-leito?instituicaoId=`: atendimentos em aberto da instituição cujo paciente não está internado, do mais antigo para o mais recente. É de onde se escolhe quem internar, e é a fila de espera quando não há leito livre.
+
+Provado em `InternacoesDaInstituicaoTest` e, para o vínculo, no `VinculoEmTodaRotaTest`.
 
 ## Desempenho e carga (RNF-001, RNF-002)
 
