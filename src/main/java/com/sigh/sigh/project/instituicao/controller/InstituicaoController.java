@@ -19,11 +19,12 @@ public class InstituicaoController {
 
 	/**
 	 * Instituições credenciadas da rede: o paciente escolhe a quem liberar uma informação restrita (autorização
-	 * adicional, RF-009; FE-05), e o administrativo escolhe o destino de uma transferência (RF-006; FE-04).
+	 * adicional, RF-009; FE-05), o administrativo escolhe o destino de uma transferência (RF-006; FE-04), e o
+	 * auditor/gestor escolhe o hospital no painel da rede (RF-011; FE-09).
 	 * Só nome e id: não traz dado de paciente nem de profissional.
 	 */
 	@GetMapping
-	@PreAuthorize("hasAnyRole('PACIENTE', 'ADMINISTRATIVO')")
+	@PreAuthorize("hasAnyRole('PACIENTE', 'ADMINISTRATIVO', 'AUDITOR_GESTOR')")
 	public List<InstituicaoDaRedeDTO> credenciadas() {
 		return instituicaoService.credenciadas();
 	}
