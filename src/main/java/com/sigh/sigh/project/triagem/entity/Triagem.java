@@ -48,6 +48,12 @@ public class Triagem {
 
 	private LocalDateTime confirmadaEm;
 
+	/** Verdadeiro enquanto a cor sugerida foi dada sem sinais vitais (pré-classificação na admissão). */
+	private boolean sugestaoPreliminar;
+
+	@Enumerated(EnumType.STRING)
+	private SituacaoSugestao situacaoSugestao;
+
 	@ManyToOne(fetch = FetchType.LAZY)
 	private Usuario registrador;
 

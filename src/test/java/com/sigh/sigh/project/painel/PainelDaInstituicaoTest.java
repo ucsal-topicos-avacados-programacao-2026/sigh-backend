@@ -62,18 +62,18 @@ class PainelDaInstituicaoTest extends TesteIntegracao {
 	@Test
 	void contaLeitosFilaEsperaInternadosChegadasETransferenciasSoDaInstituicao() throws Exception {
 		LocalDateTime inicio = LocalDateTime.now(relogio);
-		UUID aguardandoHaMais = admitir(administrativoA, hospitalA);
-		classificar(admitir(administrativoA, hospitalA), "AMARELO");
+		UUID aguardandoHaMais = admitir(hospitalA);
+		classificar(admitir(hospitalA), "AMARELO");
 		relogio.avancar(Duration.ofMinutes(50));
-		classificar(admitir(administrativoA, hospitalA), "VERDE");
-		UUID reclassificado = admitir(administrativoA, hospitalA);
+		classificar(admitir(hospitalA), "VERDE");
+		UUID reclassificado = admitir(hospitalA);
 		classificar(reclassificado, "VERDE");
 		relogio.avancar(Duration.ofMinutes(10));
 		classificar(reclassificado, "LARANJA");
 		// Triagem começada e não confirmada: continua aguardando triagem.
-		como(enfermeiroA, "ENFERMEIRO", post("/triagens").content(TRIAGEM.formatted(admitir(administrativoA, hospitalA))))
+		como(enfermeiroA, "ENFERMEIRO", post("/triagens").content(TRIAGEM.formatted(admitir(hospitalA))))
 				.andExpect(status().isCreated());
-		UUID internado = admitir(administrativoA, hospitalA);
+		UUID internado = admitir(hospitalA);
 		registrar(internado);
 		UUID enfermariaOcupada = leito(administrativoA, hospitalA, "ENFERMARIA");
 		leito(administrativoA, hospitalA, "ENFERMARIA");
@@ -82,16 +82,16 @@ class PainelDaInstituicaoTest extends TesteIntegracao {
 				.andExpect(status().isOk());
 		UUID internacao = internar(administrativoA, internado, enfermariaOcupada);
 		relogio.avancar(Duration.ofMinutes(20));
-		classificar(admitir(administrativoA, hospitalA), "AMARELO");
+		classificar(admitir(hospitalA), "AMARELO");
 		// Encerrados: um chegou no último segundo de ontem, o outro à meia-noite de hoje.
 		LocalDateTime meiaNoite = LocalDate.now(relogio).atStartOfDay();
-		encerrarComChegada(admitir(administrativoA, hospitalA), meiaNoite.minusSeconds(1));
-		encerrarComChegada(admitir(administrativoA, hospitalA), meiaNoite);
+		encerrarComChegada(admitir(hospitalA), meiaNoite.minusSeconds(1));
+		encerrarComChegada(admitir(hospitalA), meiaNoite);
 
 		// O outro hospital: quem aguarda, um internado e um pedido de transferência para o hospital A.
 		String administrativoB = cenario.administrativo(hospitalB);
-		admitir(administrativoB, hospitalB);
-		UUID internacaoB = internar(administrativoB, admitir(administrativoB, hospitalB), leito(administrativoB, hospitalB, "ENFERMARIA"));
+		admitir(hospitalB);
+		UUID internacaoB = internar(administrativoB, admitir(hospitalB), leito(administrativoB, hospitalB, "ENFERMARIA"));
 		pedirTransferencia(administrativoB, internacaoB, hospitalA);
 		pedirTransferencia(administrativoA, internacao, hospitalB);
 		relogio.avancar(Duration.ofMinutes(10));
@@ -134,7 +134,7 @@ class PainelDaInstituicaoTest extends TesteIntegracao {
 
 	@Test
 	void transferidoDeLeitoContaUmaVezEPedidosRecebidosEEnviadosSaoContadosAParte() throws Exception {
-		UUID internado = admitir(administrativoA, hospitalA);
+		UUID internado = admitir(hospitalA);
 		registrar(internado);
 		UUID primeiro = leito(administrativoA, hospitalA, "ENFERMARIA");
 		UUID segundo = leito(administrativoA, hospitalA, "ENFERMARIA");
@@ -145,7 +145,7 @@ class PainelDaInstituicaoTest extends TesteIntegracao {
 		// Dois pedidos chegam do hospital B; o hospital A envia um.
 		String administrativoB = cenario.administrativo(hospitalB);
 		for (int i = 0; i < 2; i++) {
-			UUID internacaoB = internar(administrativoB, admitir(administrativoB, hospitalB),
+			UUID internacaoB = internar(administrativoB, admitir(hospitalB),
 					leito(administrativoB, hospitalB, "ENFERMARIA"));
 			pedirTransferencia(administrativoB, internacaoB, hospitalA);
 		}
@@ -163,7 +163,7 @@ class PainelDaInstituicaoTest extends TesteIntegracao {
 
 	@Test
 	void tempoNoLimiteDaCorNaoContaComoAcima() throws Exception {
-		classificar(admitir(administrativoA, hospitalA), "AMARELO");
+		classificar(admitir(hospitalA), "AMARELO");
 		relogio.avancar(Duration.ofMinutes(60));
 		List<Map<String, Object>> fila = JsonPath.read(painel(enfermeiroA, "ENFERMEIRO", hospitalA)
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.fila");
@@ -188,7 +188,7 @@ class PainelDaInstituicaoTest extends TesteIntegracao {
 	@Test
 	void gestorDaRedeVeQualquerInstituicaoSemVinculo() throws Exception {
 		String gestor = cenario.usuario(Perfil.AUDITOR_GESTOR).getLogin();
-		admitir(cenario.administrativo(hospitalB), hospitalB);
+		admitir(hospitalB);
 		String corpo = painel(gestor, "AUDITOR_GESTOR", hospitalB).andExpect(status().isOk())
 				.andReturn().getResponse().getContentAsString();
 		assertThat(JsonPath.<String>read(corpo, "$.instituicaoId")).isEqualTo(hospitalB.getId().toString());
@@ -225,9 +225,9 @@ class PainelDaInstituicaoTest extends TesteIntegracao {
 		return mvc.perform(get("/painel").param("instituicaoId", hospital.getId().toString()).with(user(login).roles(perfil)));
 	}
 
-	private UUID admitir(String administrativo, Instituicao hospital) throws Exception {
+	private UUID admitir(Instituicao hospital) throws Exception {
 		admitidos++;
-		return id(como(administrativo, "ADMINISTRATIVO", post("/api/pacientes/admissoes").content("""
+		return id(como(cenario.recepcao(hospital), "RECEPCAO", post("/api/pacientes/admissoes").content("""
 				{"cpf":"%s","nome":"%s","dataNascimento":"1980-05-17","instituicaoId":"%s","motivo":"%s"}
 				""".formatted(Cenario.novoCpf(), NOME + admitidos, hospital.getId(), MOTIVO + admitidos)))
 				.andExpect(status().isCreated()), "$.atendimentoId");

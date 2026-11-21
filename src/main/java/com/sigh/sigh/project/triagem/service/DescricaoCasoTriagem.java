@@ -25,6 +25,9 @@ final class DescricaoCasoTriagem {
 	}
 
 	private static String descreverSinaisVitais(SinaisVitais sinais) {
+		if (sinais == null) {
+			return "ainda não medidos (classifique pelos sintomas e pelo histórico, sem supor valores)";
+		}
 		return String.join("; ",
 				"pressão arterial " + valorOuNaoInformado(sinais.getPressaoArterial()),
 				"frequência cardíaca " + valorOuNaoInformado(sinais.getFrequenciaCardiaca()),

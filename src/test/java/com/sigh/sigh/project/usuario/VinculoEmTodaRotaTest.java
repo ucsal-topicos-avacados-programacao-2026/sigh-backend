@@ -64,7 +64,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class VinculoEmTodaRotaTest extends TesteIntegracao {
 
-	private static final Set<String> PERFIS_DE_INSTITUICAO = Set.of("MEDICO", "ENFERMEIRO", "ADMINISTRATIVO");
+	private static final Set<String> PERFIS_DE_INSTITUICAO = Set.of("MEDICO", "ENFERMEIRO", "ADMINISTRATIVO", "RECEPCAO");
 	private static final Pattern PERFIL = Pattern.compile("'([A-Z_]+)'");
 	/**
 	 * As únicas regras de acesso que o teste sabe ler. Qualquer outra (hasAuthority, SpEL com bean,
@@ -125,6 +125,10 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 		casos.put("POST /resumos/{resumoId}/validacao", d -> post("/resumos/{id}/validacao", d.resumoId()));
 		casos.put("POST /triagens", d -> post("/triagens").content(TRIAGEM.formatted(d.atendimentoSemTriagemId())));
 		casos.put("POST /triagens/{triagemId}/sugestao", d -> post("/triagens/{id}/sugestao", d.triagemId()));
+		casos.put("PATCH /triagens/{triagemId}/sinais-vitais", d -> patch("/triagens/{id}/sinais-vitais", d.triagemId())
+				.content("{\"sinaisVitais\":{\"frequenciaCardiaca\":90}}"));
+		casos.put("GET /triagens/pre-classificacao", d -> get("/triagens/pre-classificacao")
+				.param("atendimentoId", d.atendimentoId().toString()).param("instituicaoId", d.hospital().getId().toString()));
 		casos.put("POST /triagens/{triagemId}/confirmacao",
 				d -> post("/triagens/{id}/confirmacao", d.triagemId()).content("{\"cor\":\"VERDE\"}"));
 		casos.put("GET /triagens/fila", d -> get("/triagens/fila").param("instituicaoId", d.hospital().getId().toString()));
@@ -249,10 +253,11 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 	private Dados montarHospital() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
 		String administrativo = cenario.administrativo(hospital);
+		String recepcao = cenario.recepcao(hospital);
 		String enfermeiro = cenario.profissional(hospital, Perfil.ENFERMEIRO);
 		String medico = cenario.profissional(hospital, Perfil.MEDICO);
 		String cpf = Cenario.novoCpf();
-		MvcResult admissao = executar(administrativo, "ADMINISTRATIVO", post("/api/pacientes/admissoes").content("""
+		MvcResult admissao = executar(recepcao, "RECEPCAO", post("/api/pacientes/admissoes").content("""
 				{"cpf":"%s","nome":"Maria Fictícia","dataNascimento":"1980-05-17",
 				 "consentimentoInicial":"AUTORIZADO","instituicaoId":"%s","motivo":"Febre"}
 				""".formatted(cpf, hospital.getId())));
@@ -261,10 +266,10 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 		cenario.registroClinico(pacienteId, hospital, "Clínica geral", "Asma");
 		UUID triagemId = id(executar(enfermeiro, "ENFERMEIRO", post("/triagens").content(TRIAGEM.formatted(atendimentoId))), "$.id");
 		UUID resumoId = resumoHistoricoService.solicitar(atendimentoId, medico).resumoId();
-		UUID atendimentoSemTriagem = segundaAdmissao(administrativo, hospital);
+		UUID atendimentoSemTriagem = segundaAdmissao(hospital);
 		UUID leito = leito(administrativo, hospital);
 		UUID leitoLivre = leito(administrativo, hospital);
-		UUID internado = segundaAdmissao(administrativo, hospital);
+		UUID internado = segundaAdmissao(hospital);
 		UUID internacaoId = id(executar(administrativo, "ADMINISTRATIVO", post("/internacoes")
 				.content("{\"atendimentoId\":\"%s\",\"leitoId\":\"%s\"}".formatted(internado, leito))), "$.id");
 		cenario.representante(pacienteId, LocalDateTime.now(relogio).minusDays(1), null);
@@ -274,7 +279,7 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 		Instituicao outra = cenario.instituicao(true);
 		String administrativoDaOutra = cenario.administrativo(outra);
 		UUID internacaoNaOutra = id(executar(administrativoDaOutra, "ADMINISTRATIVO", post("/internacoes").content(
-				"{\"atendimentoId\":\"%s\",\"leitoId\":\"%s\"}".formatted(segundaAdmissao(administrativoDaOutra, outra),
+				"{\"atendimentoId\":\"%s\",\"leitoId\":\"%s\"}".formatted(segundaAdmissao(outra),
 						leito(administrativoDaOutra, outra)))), "$.id");
 		UUID recebida = id(executar(administrativoDaOutra, "ADMINISTRATIVO", post("/internacoes/{id}/solicitacoes-transferencia",
 				internacaoNaOutra).content("{\"instituicaoDestinoId\":\"%s\",\"categoria\":\"ENFERMARIA\"}"
@@ -286,8 +291,8 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 				leitoLivre, internacaoId, representacaoId, outra, enviada, recebida);
 	}
 
-	private UUID segundaAdmissao(String administrativo, Instituicao hospital) throws Exception {
-		return id(executar(administrativo, "ADMINISTRATIVO", post("/api/pacientes/admissoes").content("""
+	private UUID segundaAdmissao(Instituicao hospital) throws Exception {
+		return id(executar(cenario.recepcao(hospital), "RECEPCAO", post("/api/pacientes/admissoes").content("""
 				{"cpf":"%s","nome":"Paciente Fictício","dataNascimento":"1990-01-01","instituicaoId":"%s","motivo":"Tosse"}
 				""".formatted(Cenario.novoCpf(), hospital.getId()))), "$.atendimentoId");
 	}

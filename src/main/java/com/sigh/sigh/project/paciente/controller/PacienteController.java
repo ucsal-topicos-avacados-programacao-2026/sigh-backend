@@ -28,14 +28,14 @@ public class PacienteController {
 	}
 
 	@PostMapping("/busca")
-	@PreAuthorize("hasRole('ADMINISTRATIVO')")
+	@PreAuthorize("hasRole('RECEPCAO')")
 	public PacienteResumoResponse buscarPorCpf(@Valid @RequestBody BuscaPacienteRequest requisicao,
 			Authentication autenticacao) {
 		return admissaoService.buscarPorCpf(requisicao, autenticacao.getName());
 	}
 
 	@PostMapping("/admissoes")
-	@PreAuthorize("hasRole('ADMINISTRATIVO')")
+	@PreAuthorize("hasRole('RECEPCAO')")
 	@ResponseStatus(HttpStatus.CREATED)
 	public AdmissaoResponse admitir(@Valid @RequestBody AdmissaoRequest requisicao, Authentication autenticacao) {
 		try {

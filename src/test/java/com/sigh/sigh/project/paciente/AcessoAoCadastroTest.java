@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** BE-15: o Administrativo liga a conta do paciente e registra o representante legal. */
+/** BE-15: a Recepção liga a conta do paciente e registra o representante legal. */
 class AcessoAoCadastroTest extends TesteIntegracao {
 
 	@Autowired
@@ -41,14 +41,14 @@ class AcessoAoCadastroTest extends TesteIntegracao {
 	TransactionTemplate transacao;
 
 	private Instituicao hospital;
-	private String administrativo;
+	private String recepcao;
 	private UUID pacienteId;
 
 	@BeforeEach
 	void prepararPaciente() throws Exception {
 		hospital = cenario.instituicao(true);
-		administrativo = cenario.administrativo(hospital);
-		pacienteId = admitir(hospital, administrativo);
+		recepcao = cenario.recepcao(hospital);
+		pacienteId = admitir(hospital, recepcao);
 	}
 
 	@Test
@@ -56,7 +56,7 @@ class AcessoAoCadastroTest extends TesteIntegracao {
 		String conta = cenario.usuario(Perfil.PACIENTE).getLogin();
 		consentimentosDe(conta).andExpect(status().isForbidden());
 
-		vincularConta(administrativo, hospital, conta).andExpect(status().isNoContent());
+		vincularConta(recepcao, hospital, conta).andExpect(status().isNoContent());
 
 		consentimentosDe(conta).andExpect(status().isOk()).andExpect(jsonPath("$.vigente.decisao").value("AUTORIZADO"));
 		mvc.perform(get("/api/pacientes/{id}/historico", pacienteId).with(user(conta).roles("PACIENTE")))
@@ -65,33 +65,33 @@ class AcessoAoCadastroTest extends TesteIntegracao {
 
 	@Test
 	void contaPrecisaSerDePacienteLivreEOCadastroSemConta() throws Exception {
-		vincularConta(administrativo, hospital, cenario.usuario(Perfil.MEDICO).getLogin())
+		vincularConta(recepcao, hospital, cenario.usuario(Perfil.MEDICO).getLogin())
 				.andExpect(status().isUnprocessableContent());
-		vincularConta(administrativo, hospital, "login-inexistente").andExpect(status().isUnprocessableContent());
-		vincularConta(administrativo, hospital, administrativo).andExpect(status().isUnprocessableContent());
+		vincularConta(recepcao, hospital, "login-inexistente").andExpect(status().isUnprocessableContent());
+		vincularConta(recepcao, hospital, recepcao).andExpect(status().isUnprocessableContent());
 
-		String contaDeOutro = cenario.contaDoPaciente(admitir(hospital, administrativo));
-		vincularConta(administrativo, hospital, contaDeOutro).andExpect(status().isUnprocessableContent());
+		String contaDeOutro = cenario.contaDoPaciente(admitir(hospital, recepcao));
+		vincularConta(recepcao, hospital, contaDeOutro).andExpect(status().isUnprocessableContent());
 
-		vincularConta(administrativo, hospital, cenario.usuario(Perfil.PACIENTE).getLogin()).andExpect(status().isNoContent());
-		vincularConta(administrativo, hospital, cenario.usuario(Perfil.PACIENTE).getLogin())
+		vincularConta(recepcao, hospital, cenario.usuario(Perfil.PACIENTE).getLogin()).andExpect(status().isNoContent());
+		vincularConta(recepcao, hospital, cenario.usuario(Perfil.PACIENTE).getLogin())
 				.andExpect(status().isUnprocessableContent());
 	}
 
 	/** Quem não tem relação com o paciente não consegue dar acesso aos dados dele. */
 	@Test
-	void soAdministrativoComVinculoNumaInstituicaoQueAtendeuOPacienteDaAcesso() throws Exception {
+	void soRecepcaoComVinculoNumaInstituicaoQueAtendeuOPacienteDaAcesso() throws Exception {
 		Instituicao outra = cenario.instituicao(true);
 		String conta = cenario.usuario(Perfil.PACIENTE).getLogin();
 
-		vincularConta(cenario.administrativo(outra), outra, conta).andExpect(status().isForbidden());
-		vincularConta(cenario.administrativo(outra), hospital, conta).andExpect(status().isForbidden());
-		mvc.perform(post("/api/pacientes/{id}/conta", pacienteId).with(user(administrativo).roles("PACIENTE")).with(csrf())
+		vincularConta(cenario.recepcao(outra), outra, conta).andExpect(status().isForbidden());
+		vincularConta(cenario.recepcao(outra), hospital, conta).andExpect(status().isForbidden());
+		mvc.perform(post("/api/pacientes/{id}/conta", pacienteId).with(user(recepcao).roles("PACIENTE")).with(csrf())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("{\"instituicaoId\":\"%s\",\"login\":\"%s\"}".formatted(hospital.getId(), conta)))
 				.andExpect(status().isForbidden());
-		representantes(cenario.administrativo(outra), outra).andExpect(status().isForbidden());
-		mvc.perform(post("/api/pacientes/{id}/conta", UUID.randomUUID()).with(user(administrativo).roles("ADMINISTRATIVO"))
+		representantes(cenario.recepcao(outra), outra).andExpect(status().isForbidden());
+		mvc.perform(post("/api/pacientes/{id}/conta", UUID.randomUUID()).with(user(recepcao).roles("RECEPCAO"))
 						.with(csrf()).contentType(MediaType.APPLICATION_JSON)
 						.content("{\"instituicaoId\":\"%s\",\"login\":\"%s\"}".formatted(hospital.getId(), conta)))
 				.andExpect(status().isForbidden());
@@ -111,11 +111,11 @@ class AcessoAoCadastroTest extends TesteIntegracao {
 		registrarRepresentante(representante, "{}").andExpect(status().isUnprocessableContent());
 		mvc.perform(get("/api/pacientes/{id}/historico", pacienteId).with(user(representante).roles("PACIENTE")))
 				.andExpect(status().isOk());
-		representantes(administrativo, hospital).andExpect(jsonPath("$.length()").value(1));
+		representantes(recepcao, hospital).andExpect(jsonPath("$.length()").value(1));
 
 		relogio.avancar(Duration.ofMinutes(5));
 		mvc.perform(post("/api/pacientes/{id}/representantes/{r}/encerramento", pacienteId, JsonPath.read(registrado, "$.id"))
-						.with(user(administrativo).roles("ADMINISTRATIVO")).with(csrf())
+						.with(user(recepcao).roles("RECEPCAO")).with(csrf())
 						.contentType(MediaType.APPLICATION_JSON).content("{\"instituicaoId\":\"%s\"}".formatted(hospital.getId())))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.vigente").value(false));
@@ -126,16 +126,16 @@ class AcessoAoCadastroTest extends TesteIntegracao {
 	/** Dar acesso ao prontuário a alguém fica na auditoria imutável, com quem fez e em qual instituição. */
 	@Test
 	void vinculoDeContaERepresentacaoFicamNaAuditoria() throws Exception {
-		vincularConta(administrativo, hospital, cenario.usuario(Perfil.PACIENTE).getLogin()).andExpect(status().isNoContent());
+		vincularConta(recepcao, hospital, cenario.usuario(Perfil.PACIENTE).getLogin()).andExpect(status().isNoContent());
 		String registrado = registrarRepresentante(cenario.usuario(Perfil.PACIENTE).getLogin(), "{}")
 				.andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
 		mvc.perform(post("/api/pacientes/{id}/representantes/{r}/encerramento", pacienteId, JsonPath.read(registrado, "$.id"))
-						.with(user(administrativo).roles("ADMINISTRATIVO")).with(csrf())
+						.with(user(recepcao).roles("RECEPCAO")).with(csrf())
 						.contentType(MediaType.APPLICATION_JSON).content("{\"instituicaoId\":\"%s\"}".formatted(hospital.getId())))
 				.andExpect(status().isOk());
 
 		List<String> finalidades = transacao.execute(status -> registroAuditoriaRepository.findAll().stream()
-				.filter(registro -> registro.getAtor().getLogin().equals(administrativo))
+				.filter(registro -> registro.getAtor().getLogin().equals(recepcao))
 				.filter(registro -> registro.getInstituicao().getId().equals(hospital.getId()))
 				.map(registro -> registro.getFinalidadeDeclarada())
 				.toList());
@@ -145,12 +145,12 @@ class AcessoAoCadastroTest extends TesteIntegracao {
 
 	@Test
 	void administrativoNaoSeRegistraComoRepresentante() throws Exception {
-		Usuario proprio = usuarioRepository.findByLogin(administrativo).orElseThrow();
+		Usuario proprio = usuarioRepository.findByLogin(recepcao).orElseThrow();
 		proprio.getPerfis().add(Perfil.PACIENTE);
 		usuarioRepository.save(proprio);
 
-		registrarRepresentante(administrativo, "{}").andExpect(status().isUnprocessableContent());
-		vincularConta(administrativo, hospital, administrativo).andExpect(status().isUnprocessableContent());
+		registrarRepresentante(recepcao, "{}").andExpect(status().isUnprocessableContent());
+		vincularConta(recepcao, hospital, recepcao).andExpect(status().isUnprocessableContent());
 	}
 
 	@Test
@@ -166,14 +166,14 @@ class AcessoAoCadastroTest extends TesteIntegracao {
 
 	private ResultActions encerrarRepresentacao(String representacaoId) throws Exception {
 		return mvc.perform(post("/api/pacientes/{id}/representantes/{r}/encerramento", pacienteId, representacaoId)
-				.with(user(administrativo).roles("ADMINISTRATIVO")).with(csrf())
+				.with(user(recepcao).roles("RECEPCAO")).with(csrf())
 				.contentType(MediaType.APPLICATION_JSON).content("{\"instituicaoId\":\"%s\"}".formatted(hospital.getId())));
 	}
 
 	@Test
 	void representacaoPrecisaDeDocumentoEPeriodoValido() throws Exception {
 		String representante = cenario.usuario(Perfil.PACIENTE).getLogin();
-		mvc.perform(post("/api/pacientes/{id}/representantes", pacienteId).with(user(administrativo).roles("ADMINISTRATIVO"))
+		mvc.perform(post("/api/pacientes/{id}/representantes", pacienteId).with(user(recepcao).roles("RECEPCAO"))
 						.with(csrf()).contentType(MediaType.APPLICATION_JSON)
 						.content("{\"instituicaoId\":\"%s\",\"login\":\"%s\"}".formatted(hospital.getId(), representante)))
 				.andExpect(status().isBadRequest())
@@ -186,9 +186,9 @@ class AcessoAoCadastroTest extends TesteIntegracao {
 		registrarRepresentante(conta, "{}").andExpect(status().isUnprocessableContent());
 	}
 
-	private ResultActions vincularConta(String loginAdministrativo, Instituicao instituicao, String conta) throws Exception {
+	private ResultActions vincularConta(String loginRecepcao, Instituicao instituicao, String conta) throws Exception {
 		return mvc.perform(post("/api/pacientes/{id}/conta", pacienteId)
-				.with(user(loginAdministrativo).roles("ADMINISTRATIVO")).with(csrf())
+				.with(user(loginRecepcao).roles("RECEPCAO")).with(csrf())
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("{\"instituicaoId\":\"%s\",\"login\":\"%s\"}".formatted(instituicao.getId(), conta)));
 	}
@@ -198,23 +198,23 @@ class AcessoAoCadastroTest extends TesteIntegracao {
 				+ "\"instituicaoId\":\"%s\",\"login\":\"%s\",\"documento\":\"Termo de curatela nº 123\"}"
 				.formatted(hospital.getId(), login);
 		return mvc.perform(post("/api/pacientes/{id}/representantes", pacienteId)
-				.with(user(administrativo).roles("ADMINISTRATIVO")).with(csrf())
+				.with(user(recepcao).roles("RECEPCAO")).with(csrf())
 				.contentType(MediaType.APPLICATION_JSON).content(corpo));
 	}
 
-	private ResultActions representantes(String loginAdministrativo, Instituicao instituicao) throws Exception {
+	private ResultActions representantes(String loginRecepcao, Instituicao instituicao) throws Exception {
 		return mvc.perform(get("/api/pacientes/{id}/representantes", pacienteId)
 				.param("instituicaoId", instituicao.getId().toString())
-				.with(user(loginAdministrativo).roles("ADMINISTRATIVO")));
+				.with(user(loginRecepcao).roles("RECEPCAO")));
 	}
 
 	private ResultActions consentimentosDe(String conta) throws Exception {
 		return mvc.perform(get("/api/pacientes/me/consentimentos").with(user(conta).roles("PACIENTE")));
 	}
 
-	private UUID admitir(Instituicao instituicao, String loginAdministrativo) throws Exception {
+	private UUID admitir(Instituicao instituicao, String loginRecepcao) throws Exception {
 		MvcResult resultado = mvc.perform(post("/api/pacientes/admissoes")
-						.with(user(loginAdministrativo).roles("ADMINISTRATIVO")).with(csrf())
+						.with(user(loginRecepcao).roles("RECEPCAO")).with(csrf())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"cpf":"%s","nome":"Maria Fictícia","dataNascimento":"1980-05-17",

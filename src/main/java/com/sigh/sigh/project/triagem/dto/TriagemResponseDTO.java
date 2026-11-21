@@ -1,6 +1,7 @@
 package com.sigh.sigh.project.triagem.dto;
 
 import com.sigh.sigh.project.triagem.entity.CorRisco;
+import com.sigh.sigh.project.triagem.entity.SituacaoSugestao;
 import com.sigh.sigh.project.triagem.entity.Triagem;
 
 import java.time.LocalDateTime;
@@ -13,7 +14,9 @@ public record TriagemResponseDTO(
 		SinaisVitaisDTO sinaisVitais,
 		CorRisco corSugerida,
 		CorRisco corConfirmada,
-		LocalDateTime confirmadaEm) {
+		LocalDateTime confirmadaEm,
+		boolean sugestaoPreliminar,
+		SituacaoSugestao situacaoSugestao) {
 
 	public static TriagemResponseDTO de(Triagem triagem) {
 		return new TriagemResponseDTO(
@@ -23,6 +26,8 @@ public record TriagemResponseDTO(
 				SinaisVitaisDTO.de(triagem.getSinaisVitais()),
 				triagem.getCorSugerida(),
 				triagem.getCorConfirmada(),
-				triagem.getConfirmadaEm());
+				triagem.getConfirmadaEm(),
+				triagem.isSugestaoPreliminar(),
+				triagem.getSituacaoSugestao());
 	}
 }

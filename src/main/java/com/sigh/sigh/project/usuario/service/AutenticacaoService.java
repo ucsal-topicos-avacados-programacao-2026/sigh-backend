@@ -21,7 +21,7 @@ import java.util.Set;
 public class AutenticacaoService {
 
 	private static final Set<Perfil> PERFIS_COM_SEGUNDO_FATOR =
-			EnumSet.of(Perfil.MEDICO, Perfil.ENFERMEIRO, Perfil.AUDITOR_GESTOR);
+			EnumSet.of(Perfil.MEDICO, Perfil.ENFERMEIRO, Perfil.RECEPCAO, Perfil.AUDITOR_GESTOR);
 
 	private final UsuarioRepository usuarioRepository;
 	private final PasswordEncoder codificadorDeSenha;

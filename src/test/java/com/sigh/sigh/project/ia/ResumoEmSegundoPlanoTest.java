@@ -231,7 +231,7 @@ class ResumoEmSegundoPlanoTest extends TesteIntegracao {
 	private Caso caso() {
 		try {
 			MvcResult admissao = mvc.perform(post("/api/pacientes/admissoes")
-							.with(user(cenario.administrativo(hospital)).roles("ADMINISTRATIVO")).with(csrf())
+							.with(user(cenario.recepcao(hospital)).roles("RECEPCAO")).with(csrf())
 							.contentType(MediaType.APPLICATION_JSON)
 							.content("""
 									{"cpf":"%s","nome":"Paciente Fictício","dataNascimento":"1980-05-17",

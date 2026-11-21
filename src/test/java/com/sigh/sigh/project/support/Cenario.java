@@ -127,6 +127,12 @@ public class Cenario {
 		return vinculo(instituicao, Perfil.ADMINISTRATIVO, agora.minusDays(30), null);
 	}
 
+	/** Usuário com vínculo de recepção ativo na instituição; retorna o login. */
+	public String recepcao(Instituicao instituicao) {
+		LocalDateTime agora = LocalDateTime.now(clock);
+		return vinculo(instituicao, Perfil.RECEPCAO, agora.minusDays(30), null);
+	}
+
 	public String vinculo(Instituicao instituicao, Perfil perfil, LocalDateTime inicio, LocalDateTime fim) {
 		Usuario usuario = usuario(perfil);
 		VinculoInstitucional vinculo = new VinculoInstitucional();
