@@ -1,13 +1,66 @@
 # sigh-backend
 
-Back-end do SIGH (Spring Boot 4, Java 21, PostgreSQL 17).
+Back-end do SIGH (Spring Boot 4, Java 21, PostgreSQL).
+
+## Como baixar e rodar
+
+**Pré-requisitos**
+- **Git** e **JDK 21**. O Maven não precisa ser instalado: o projeto traz o `./mvnw`.
+- **PostgreSQL** rodando em `localhost:5432`, com a extensão `pgcrypto` (vem com o pacote `postgresql-contrib` em algumas distribuições).
+- **Ollama** com o modelo `qwen3:8b`, só para a sugestão de risco e o resumo por IA. Sem ele, o resto da API funciona e essas duas rotas respondem 503.
+- **Docker**, só para os testes (veja a próxima seção).
+
+**1. Baixar**
+
+```bash
+git clone https://github.com/ucsal-topicos-avacados-programacao-2026/sigh-backend.git
+cd sigh-backend
+git checkout develop
+```
+
+**2. Criar o banco** (o perfil de demonstração usa `sigh_demonstracao`; os testes usam `sigh`)
+
+```bash
+createdb -U postgres sigh_demonstracao
+createdb -U postgres sigh
+```
+
+**3. Configurar as variáveis de ambiente.** Nenhum segredo fica no repositório. Gere os valores e exporte no terminal onde a API vai rodar:
+
+```bash
+export DB_USERNAME=postgres
+export DB_PASSWORD=<senha do seu PostgreSQL>
+export SIGH_JWT_SEGREDO=$(openssl rand -base64 48)    # mínimo de 32 caracteres
+export SIGH_CHAVE_DADOS=$(openssl rand -base64 32)    # chave AES-256 dos dados clínicos
+export SIGH_SENHA_DEMONSTRACAO=<senha dos usuários de demonstração>
+export SIGH_CORS_ORIGENS=http://localhost:5173        # origem do front-end
+```
+
+Guarde o valor de `SIGH_CHAVE_DADOS`: com outra chave, os dados já gravados deixam de ser lidos. O perfil de demonstração recria o banco a cada partida, mas o perfil padrão não. As demais variáveis (IA, TLS, backup) estão nas seções abaixo.
+
+**4. Subir a IA** (outro terminal, opcional)
+
+```bash
+ollama pull qwen3:8b
+OLLAMA_KEEP_ALIVE=-1 ollama serve
+```
+
+**5. Subir a API com os dados de demonstração**
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=demonstracao
+```
+
+A API fica em `http://localhost:8080`. O perfil `demonstracao` **apaga e recria o banco `sigh_demonstracao` toda vez que sobe** e carrega três hospitais, 17 pacientes fictícios com histórico clínico, leitos, fila de triagem e os usuários `paciente.demo`, `enfermeiro.demo`, `medico.demo`, `administrativo.demo` e `auditor.demo`, todos com a senha de `SIGH_SENHA_DEMONSTRACAO`. Médico, enfermeiro e auditor cadastram o segundo fator (aplicativo autenticador) no primeiro acesso. Para rodar sem os dados de demonstração, suba sem o `-Dspring-boot.run.profiles` e com o banco `sigh` criado.
+
+**6. Subir o front-end:** siga o README do [`sigh-frontend`](https://github.com/ucsal-topicos-avacados-programacao-2026/sigh-frontend).
 
 ## Como rodar os testes
 
-Os testes usam PostgreSQL: os de repositório e o `AutenticacaoIntegracaoTest` usam o banco local (`DB_PASSWORD`); os demais sobem um PostgreSQL com Testcontainers e precisam de Docker.
+Os testes usam PostgreSQL: os de repositório e o `AutenticacaoIntegracaoTest` usam o banco local `sigh` (`DB_PASSWORD`); os demais sobem um PostgreSQL com Testcontainers e **precisam de Docker ligado**. As chaves de teste já estão em `src/test/resources`, então só `DB_PASSWORD` precisa estar definida.
 
-```
-DB_PASSWORD=... ./mvnw verify
+```bash
+DB_PASSWORD=<senha do seu PostgreSQL> ./mvnw verify
 ```
 
 ## Vínculo com a instituição (RF-012)
