@@ -113,6 +113,8 @@ O front-end (`sigh-frontend`) roda em outra origem e chama a API direto, com o t
 
 Os dois pontos estão provados em `UsuarioLogadoTest` e `CorsTest`.
 
+**Instituições da rede (FE-05):** `GET /api/instituicoes` devolve as instituições credenciadas, só com `id` e `nome`, na ordem do português. É a lista em que o paciente escolhe a quem liberar uma informação restrita (autorização adicional, RF-009), já que a API só aceita instituição credenciada. Só o perfil Paciente usa a rota; ela não traz dado de paciente nem de profissional. Provado em `InstituicoesDaRedeTest`.
+
 ## Desempenho e carga (RNF-001, RNF-002)
 
 O relatório do teste de carga, da medição da IA, da inspeção da criptografia e do ensaio de restauração está em [`carga/README.md`](carga/README.md), com os scripts para reproduzir.
