@@ -37,12 +37,27 @@ public class ContextoTriagemService {
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Triagem não encontrada."));
 		vinculoService.exigirVinculoAtivo(loginEnfermeiro, triagem.getAtendimento().getInstituicao().getId(),
 				Perfil.ENFERMEIRO);
+		return montar(triagem, loginEnfermeiro, Perfil.ENFERMEIRO, FINALIDADE_DO_ACESSO);
+	}
+
+	/**
+	 * Caso para a sugestão automática. O vínculo de quem a pediu já foi conferido ao abrir a triagem ou ao
+	 * registrar os sinais vitais; aqui só vale o que o histórico autorizado deixa passar (consentimento e restrições).
+	 * O acesso fica na auditoria em nome de quem pediu, com a finalidade dada.
+	 */
+	@Transactional
+	public CasoTriagemDTO montarCasoAutomatico(UUID triagemId, String login, Perfil perfil, String finalidade) {
+		Triagem triagem = triagemRepository.findById(triagemId)
+				.orElseThrow(() -> new RecursoNaoEncontradoException("Triagem não encontrada."));
+		return montar(triagem, login, perfil, finalidade);
+	}
+
+	private CasoTriagemDTO montar(Triagem triagem, String login, Perfil perfil, String finalidade) {
 		if (triagem.getCorConfirmada() != null) {
 			throw new RegraNegocioException("A classificação desta triagem já foi confirmada.");
 		}
 		List<RegistroClinico> historico = historicoAutorizadoService.consultar(triagem.getAtendimento(),
-				new ConsultaHistoricoDTO(loginEnfermeiro, Perfil.ENFERMEIRO, FINALIDADE_DO_ACESSO,
-						iaProperties.limiteRegistrosHistorico()));
+				new ConsultaHistoricoDTO(login, perfil, finalidade, iaProperties.limiteRegistrosHistorico()));
 		Set<UUID> registrosUsados = historico.stream().map(RegistroClinico::getId).collect(Collectors.toSet());
 		return new CasoTriagemDTO(triagem.getId(), DescricaoCasoTriagem.montar(triagem, historico), registrosUsados);
 	}

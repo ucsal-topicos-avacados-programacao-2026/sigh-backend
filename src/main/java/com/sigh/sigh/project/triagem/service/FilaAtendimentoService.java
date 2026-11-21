@@ -4,6 +4,7 @@ import com.sigh.sigh.project.prontuario.entity.Atendimento;
 import com.sigh.sigh.project.triagem.config.TempoMaximoEsperaProperties;
 import com.sigh.sigh.project.triagem.dto.AguardandoTriagemDTO;
 import com.sigh.sigh.project.triagem.dto.PacienteNaFilaDTO;
+import com.sigh.sigh.project.triagem.dto.SinaisVitaisDTO;
 import com.sigh.sigh.project.triagem.entity.Triagem;
 import com.sigh.sigh.project.triagem.repository.TriagemRepository;
 import com.sigh.sigh.project.usuario.entity.Perfil;
@@ -50,7 +51,9 @@ public class FilaAtendimentoService {
 			AguardandoTriagemDTO.TriagemPendente pendente = triagemRepository
 					.findByAtendimentoIdAndCorConfirmadaIsNull(atendimento.getId()).stream()
 					.min(Comparator.comparing((Triagem t) -> t.getCorSugerida() == null).thenComparing(Triagem::getId))
-					.map(t -> new AguardandoTriagemDTO.TriagemPendente(t.getId(), t.getSintomas(), t.getCorSugerida()))
+					.map(t -> new AguardandoTriagemDTO.TriagemPendente(t.getId(), t.getSintomas(),
+							SinaisVitaisDTO.de(t.getSinaisVitais()), t.getCorSugerida(), t.isSugestaoPreliminar(),
+							t.getSituacaoSugestao()))
 					.orElse(null);
 			return new AguardandoTriagemDTO(atendimento.getId(), atendimento.getProntuario().getPaciente().getNome(),
 					atendimento.getChegadaEm(), atendimento.getMotivo(), pendente);

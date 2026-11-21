@@ -14,14 +14,16 @@ INSERT INTO usuario (id, login, nome, senha_hash, mfa_habilitado, mfa_segredo) V
     ('20000000-0000-0000-0000-000000000002', 'enfermeiro.demo', 'Enf. Carla Lima Exemplo', crypt('${senha_demonstracao}', gen_salt('bf', 10)), FALSE, NULL),
     ('20000000-0000-0000-0000-000000000003', 'medico.demo', 'Dr. Paulo Reis Exemplo', crypt('${senha_demonstracao}', gen_salt('bf', 10)), FALSE, NULL),
     ('20000000-0000-0000-0000-000000000004', 'administrativo.demo', 'Marcos Dias Exemplo', crypt('${senha_demonstracao}', gen_salt('bf', 10)), FALSE, NULL),
-    ('20000000-0000-0000-0000-000000000005', 'auditor.demo', 'Helena Prado Exemplo', crypt('${senha_demonstracao}', gen_salt('bf', 10)), FALSE, NULL);
+    ('20000000-0000-0000-0000-000000000005', 'auditor.demo', 'Helena Prado Exemplo', crypt('${senha_demonstracao}', gen_salt('bf', 10)), FALSE, NULL),
+    ('20000000-0000-0000-0000-000000000006', 'recepcao.demo', 'Renata Matos Exemplo', crypt('${senha_demonstracao}', gen_salt('bf', 10)), FALSE, NULL);
 
 INSERT INTO usuario_perfil (usuario_id, perfil) VALUES
     ('20000000-0000-0000-0000-000000000001', 'PACIENTE'),
     ('20000000-0000-0000-0000-000000000002', 'ENFERMEIRO'),
     ('20000000-0000-0000-0000-000000000003', 'MEDICO'),
     ('20000000-0000-0000-0000-000000000004', 'ADMINISTRATIVO'),
-    ('20000000-0000-0000-0000-000000000005', 'AUDITOR_GESTOR');
+    ('20000000-0000-0000-0000-000000000005', 'AUDITOR_GESTOR'),
+    ('20000000-0000-0000-0000-000000000006', 'RECEPCAO');
 
 INSERT INTO vinculo_institucional (id, usuario_id, instituicao_id, registro_profissional, inicio_em, fim_em) VALUES
     ('21000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'COREN 000001', now() - INTERVAL '2 years', NULL),
@@ -283,3 +285,19 @@ UPDATE prontuario SET criado_em = now() - INTERVAL '2030 days' WHERE id = '40000
 UPDATE prontuario SET criado_em = now() - INTERVAL '2530 days' WHERE id = '40000000-0000-0000-0000-000000000014' AND criado_em > now() - INTERVAL '2530 days';
 UPDATE prontuario SET criado_em = now() - INTERVAL '730 days' WHERE id = '40000000-0000-0000-0000-000000000015' AND criado_em > now() - INTERVAL '730 days';
 UPDATE prontuario SET criado_em = now() - INTERVAL '2530 days' WHERE id = '40000000-0000-0000-0000-000000000017' AND criado_em > now() - INTERVAL '2530 days';
+
+INSERT INTO vinculo_institucional (id, usuario_id, instituicao_id, registro_profissional, inicio_em, fim_em) VALUES
+    ('21000000-0000-0000-0000-000000000009', '20000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000001', NULL, now() - INTERVAL '1 year', NULL),
+    ('21000000-0000-0000-0000-000000000010', '20000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000002', NULL, now() - INTERVAL '1 year', NULL),
+    ('21000000-0000-0000-0000-000000000011', '20000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000003', NULL, now() - INTERVAL '6 months', NULL);
+
+INSERT INTO vinculo_perfil (vinculo_institucional_id, perfil) VALUES
+    ('21000000-0000-0000-0000-000000000009', 'RECEPCAO'),
+    ('21000000-0000-0000-0000-000000000010', 'RECEPCAO'),
+    ('21000000-0000-0000-0000-000000000011', 'RECEPCAO');
+
+INSERT INTO triagem (id, atendimento_id, sintomas, cor_sugerida, sugestao_preliminar, situacao_sugestao, registrador_id) VALUES
+    ('b0000000-0000-0000-0000-000000000102', '50000000-0000-0000-0000-000000000002', 'Febre alta há dois dias', 'AMARELO', TRUE, 'PRONTA', '20000000-0000-0000-0000-000000000006'),
+    ('b0000000-0000-0000-0000-000000000103', '50000000-0000-0000-0000-000000000003', 'Dor abdominal intensa', 'LARANJA', TRUE, 'PRONTA', '20000000-0000-0000-0000-000000000006'),
+    ('b0000000-0000-0000-0000-000000000107', '50000000-0000-0000-0000-000000000107', 'Cefaleia intensa', 'AMARELO', TRUE, 'PRONTA', '20000000-0000-0000-0000-000000000006'),
+    ('b0000000-0000-0000-0000-000000000117', '50000000-0000-0000-0000-000000000117', 'Tontura e fraqueza', NULL, TRUE, 'INDISPONIVEL', '20000000-0000-0000-0000-000000000006');

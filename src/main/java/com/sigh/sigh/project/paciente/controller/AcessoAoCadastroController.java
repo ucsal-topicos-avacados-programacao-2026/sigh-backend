@@ -22,10 +22,10 @@ import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
 
-/** O Administrativo dá acesso ao cadastro: conta do paciente e representante legal (RF-002, RF-009). */
+/** A Recepção dá acesso ao cadastro: conta do paciente e representante legal (RF-002, RF-009). */
 @RestController
 @RequestMapping("/api/pacientes/{pacienteId}")
-@PreAuthorize("hasRole('ADMINISTRATIVO')")
+@PreAuthorize("hasRole('RECEPCAO')")
 @RequiredArgsConstructor
 public class AcessoAoCadastroController {
 
