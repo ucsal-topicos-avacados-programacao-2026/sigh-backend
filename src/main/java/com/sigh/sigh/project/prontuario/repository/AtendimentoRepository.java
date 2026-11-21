@@ -30,4 +30,16 @@ public interface AtendimentoRepository extends JpaRepository<Atendimento, UUID> 
 			order by a.chegadaEm, a.id
 			""")
 	List<Atendimento> abertosSemInternacao(UUID instituicaoId);
+
+	/** Atendimentos em andamento com o médico na instituição, do que começou antes para o mais recente (FE-07). */
+	@Query("""
+			select a from Atendimento a
+			join fetch a.prontuario p
+			join fetch p.paciente
+			left join fetch a.medicoResponsavel
+			where a.instituicao.id = :instituicaoId
+			  and a.status = com.sigh.sigh.project.prontuario.entity.StatusAtendimento.EM_ATENDIMENTO
+			order by a.inicioClinicoEm, a.id
+			""")
+	List<Atendimento> emAndamento(UUID instituicaoId);
 }
