@@ -128,6 +128,7 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 		casos.put("POST /triagens/{triagemId}/confirmacao",
 				d -> post("/triagens/{id}/confirmacao", d.triagemId()).content("{\"cor\":\"VERDE\"}"));
 		casos.put("GET /triagens/fila", d -> get("/triagens/fila").param("instituicaoId", d.hospital().getId().toString()));
+		casos.put("GET /triagens/aguardando", d -> get("/triagens/aguardando").param("instituicaoId", d.hospital().getId().toString()));
 		casos.put("POST /leitos", d -> post("/leitos").content("""
 				{"instituicaoId":"%s","codigo":"N-%s","setor":"Enfermaria","categoria":"ENFERMARIA"}
 				""".formatted(d.hospital().getId(), UUID.randomUUID().toString().substring(0, 8))));
