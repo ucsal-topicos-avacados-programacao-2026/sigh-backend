@@ -243,7 +243,7 @@ class DadosDoPacienteTest extends TesteIntegracao {
 
 	private UUID admitir(Instituicao instituicao, String cpf) throws Exception {
 		MvcResult resultado = mvc.perform(post("/api/pacientes/admissoes")
-						.with(user(cenario.administrativo(instituicao)).roles("ADMINISTRATIVO")).with(csrf())
+						.with(user(cenario.recepcao(instituicao)).roles("RECEPCAO")).with(csrf())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"cpf":"%s","nome":"Maria Fictícia","dataNascimento":"1980-05-17",

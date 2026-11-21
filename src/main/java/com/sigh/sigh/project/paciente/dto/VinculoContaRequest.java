@@ -6,6 +6,6 @@ import jakarta.validation.constraints.Size;
 
 import java.util.UUID;
 
-/** Liga a conta de acesso (perfil Paciente) ao cadastro do paciente, feito pelo Administrativo. */
+/** Liga a conta de acesso (perfil Paciente) ao cadastro do paciente, feito pela Recepção. */
 public record VinculoContaRequest(@NotNull UUID instituicaoId, @NotBlank @Size(max = 100) String login) {
 }

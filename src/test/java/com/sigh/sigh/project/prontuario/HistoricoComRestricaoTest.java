@@ -295,7 +295,7 @@ class HistoricoComRestricaoTest extends TesteIntegracao {
 
 	private MvcResult admitir(Instituicao hospital, String cpf, String consentimento) throws Exception {
 		return mvc.perform(post("/api/pacientes/admissoes")
-						.with(user(cenario.administrativo(hospital)).roles("ADMINISTRATIVO")).with(csrf())
+						.with(user(cenario.recepcao(hospital)).roles("RECEPCAO")).with(csrf())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"cpf":"%s","nome":"Maria Fictícia","dataNascimento":"1980-05-17",

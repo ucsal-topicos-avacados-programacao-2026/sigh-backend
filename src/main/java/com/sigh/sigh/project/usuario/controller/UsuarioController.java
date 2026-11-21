@@ -19,7 +19,7 @@ public class UsuarioController {
 
 	/** Quem está logado: o front-end monta o menu e o seletor de instituição com isto (FE-02). */
 	@GetMapping("/eu")
-	@PreAuthorize("hasAnyRole('PACIENTE', 'ENFERMEIRO', 'MEDICO', 'ADMINISTRATIVO', 'AUDITOR_GESTOR')")
+	@PreAuthorize("hasAnyRole('PACIENTE', 'ENFERMEIRO', 'MEDICO', 'ADMINISTRATIVO', 'RECEPCAO', 'AUDITOR_GESTOR')")
 	public UsuarioLogadoDTO eu(Principal usuario) {
 		return usuarioService.logado(usuario.getName());
 	}

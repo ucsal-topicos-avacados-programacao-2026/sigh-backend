@@ -181,8 +181,8 @@ class ConsentimentoTest extends TesteIntegracao {
 	@Test
 	void semManifestacaoNaoCompartilhaEOPacientePodeAutorizarDepois() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
-		String admin = cenario.administrativo(hospital);
-		MvcResult admissao = mvc.perform(post("/api/pacientes/admissoes").with(user(admin).roles("ADMINISTRATIVO"))
+		String admin = cenario.recepcao(hospital);
+		MvcResult admissao = mvc.perform(post("/api/pacientes/admissoes").with(user(admin).roles("RECEPCAO"))
 						.with(csrf()).contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"cpf":"%s","nome":"Sem Manifestação","dataNascimento":"1960-02-02",
@@ -252,7 +252,7 @@ class ConsentimentoTest extends TesteIntegracao {
 				.andExpect(status().isForbidden());
 		mvc.perform(decisao(semCadastro, "AUTORIZADO")).andExpect(status().isForbidden());
 
-		for (String papel : List.of("ADMINISTRATIVO", "MEDICO", "ENFERMEIRO", "AUDITOR_GESTOR")) {
+		for (String papel : List.of("ADMINISTRATIVO", "RECEPCAO", "MEDICO", "ENFERMEIRO", "AUDITOR_GESTOR")) {
 			mvc.perform(get("/api/pacientes/me/consentimentos").with(user("qualquer").roles(papel)))
 					.andExpect(status().isForbidden());
 		}
@@ -276,7 +276,7 @@ class ConsentimentoTest extends TesteIntegracao {
 
 	private UUID admitir(Instituicao instituicao, String cpf, String consentimento) throws Exception {
 		MvcResult resultado = mvc.perform(post("/api/pacientes/admissoes")
-						.with(user(cenario.administrativo(instituicao)).roles("ADMINISTRATIVO")).with(csrf())
+						.with(user(cenario.recepcao(instituicao)).roles("RECEPCAO")).with(csrf())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(novoCadastro(cpf, instituicao.getId(), consentimento)))
 				.andExpect(status().isCreated()).andReturn();
@@ -285,7 +285,7 @@ class ConsentimentoTest extends TesteIntegracao {
 
 	private MvcResult admissao(Instituicao instituicao, String cpf, String consentimento) throws Exception {
 		return mvc.perform(post("/api/pacientes/admissoes")
-						.with(user(cenario.administrativo(instituicao)).roles("ADMINISTRATIVO")).with(csrf())
+						.with(user(cenario.recepcao(instituicao)).roles("RECEPCAO")).with(csrf())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(novoCadastro(cpf, instituicao.getId(), consentimento)))
 				.andExpect(status().isCreated()).andReturn();

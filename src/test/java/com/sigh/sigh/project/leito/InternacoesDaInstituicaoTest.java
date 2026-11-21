@@ -51,7 +51,7 @@ class InternacoesDaInstituicaoTest extends TesteIntegracao {
 
 	@Test
 	void internacoesAtivasSoDosLeitosDaInstituicaoComResumosDaInternacaoEPedidoPendente() throws Exception {
-		UUID atendimentoMaria = admitir(administrativoA, hospitalA, "Maria Fictícia");
+		UUID atendimentoMaria = admitir(hospitalA, "Maria Fictícia");
 		// Resumo de alta de antes da internação: não serve para esta alta e não aparece.
 		resumoDeAlta(atendimentoMaria, "Dra. Antiga");
 		relogio.avancar(Duration.ofMinutes(5));
@@ -66,20 +66,20 @@ class InternacoesDaInstituicaoTest extends TesteIntegracao {
 				.content("{\"instituicaoDestinoId\":\"%s\",\"categoria\":\"UTI\"}".formatted(hospitalB.getId())))
 				.andExpect(status().isCreated()), "$.id");
 
-		UUID atendimentoJoao = admitir(administrativoA, hospitalA, "João Fictício");
+		UUID atendimentoJoao = admitir(hospitalA, "João Fictício");
 		UUID internacaoJoao = internar(administrativoA, atendimentoJoao, leito(administrativoA, hospitalA, "M-5", "ENFERMARIA"));
 		// Transferido dentro do hospital: aparece no leito novo.
 		como(administrativoA, post("/internacoes/{id}/transferencia", internacaoJoao).content("{\"leitoDestinoId\":\"%s\"}".formatted(leitoA)))
 				.andExpect(status().isOk());
 
 		// Com alta: não aparece.
-		UUID atendimentoAna = admitir(administrativoA, hospitalA, "Ana Fictícia");
+		UUID atendimentoAna = admitir(hospitalA, "Ana Fictícia");
 		UUID internacaoAna = internar(administrativoA, atendimentoAna, leito(administrativoA, hospitalA, "B-2", "ENFERMARIA"));
 		como(administrativoA, post("/internacoes/{id}/alta", internacaoAna)
 				.content("{\"resumoAltaId\":\"%s\"}".formatted(resumoDeAlta(atendimentoAna, "Dr. Alta")))).andExpect(status().isOk());
 
 		// Internada em outro hospital: não aparece para o hospital A.
-		UUID atendimentoBia = admitir(administrativoB, hospitalB, "Bia Fictícia");
+		UUID atendimentoBia = admitir(hospitalB, "Bia Fictícia");
 		internar(administrativoB, atendimentoBia, leito(administrativoB, hospitalB, "C-3", "ENFERMARIA"));
 
 		List<Map<String, Object>> ativas = lista(como(administrativoA, get("/internacoes").param("instituicaoId", hospitalA.getId().toString()))
@@ -109,7 +109,7 @@ class InternacoesDaInstituicaoTest extends TesteIntegracao {
 	void internacoesVemPeloCodigoDoLeito() throws Exception {
 		// Cinco leitos criados fora da ordem: pela ordem do id, a certa só sairia por acaso (1 em 120).
 		for (String codigo : List.of("E-5", "B-2", "D-4", "A-1", "C-3")) {
-			internar(administrativoA, admitir(administrativoA, hospitalA, "Paciente " + codigo),
+			internar(administrativoA, admitir(hospitalA, "Paciente " + codigo),
 					leito(administrativoA, hospitalA, codigo, "ENFERMARIA"));
 		}
 		assertThat(lista(como(administrativoA, get("/internacoes").param("instituicaoId", hospitalA.getId().toString()))))
@@ -120,7 +120,7 @@ class InternacoesDaInstituicaoTest extends TesteIntegracao {
 	void atendimentosSemLeitoVemDoMaisAntigoParaOMaisRecente() throws Exception {
 		List<UUID> chegadas = new java.util.ArrayList<>();
 		for (int i = 0; i < 5; i++) {
-			chegadas.add(admitir(administrativoA, hospitalA, "Chegada " + i));
+			chegadas.add(admitir(hospitalA, "Chegada " + i));
 			relogio.avancar(Duration.ofMinutes(1));
 		}
 		assertThat(lista(como(administrativoA, get("/internacoes/atendimentos-sem-leito").param("instituicaoId", hospitalA.getId().toString()))))
@@ -129,22 +129,22 @@ class InternacoesDaInstituicaoTest extends TesteIntegracao {
 
 	@Test
 	void atendimentosSemLeitoSaoOsAbertosDaInstituicaoSemInternacaoDoMaisAntigo() throws Exception {
-		UUID primeiro = admitir(administrativoA, hospitalA, "Primeira Chegada");
+		UUID primeiro = admitir(hospitalA, "Primeira Chegada");
 		relogio.avancar(Duration.ofMinutes(3));
-		UUID segundo = admitir(administrativoA, hospitalA, "Segunda Chegada");
+		UUID segundo = admitir(hospitalA, "Segunda Chegada");
 		relogio.avancar(Duration.ofMinutes(3));
-		UUID internado = admitir(administrativoA, hospitalA, "Já Internado");
+		UUID internado = admitir(hospitalA, "Já Internado");
 		internar(administrativoA, internado, leito(administrativoA, hospitalA, "D-4", "ENFERMARIA"));
-		UUID encerrado = admitir(administrativoA, hospitalA, "Já Encerrado");
+		UUID encerrado = admitir(hospitalA, "Já Encerrado");
 		jdbc.update("update atendimento set status = 'ENCERRADO' where id = ?", encerrado);
-		admitir(administrativoB, hospitalB, "De Outro Hospital");
+		admitir(hospitalB, "De Outro Hospital");
 		// O paciente internado volta com outro atendimento: continua fora, porque já ocupa um leito.
 		String cpfInternado = jdbc.queryForObject("""
 				select p.cpf from atendimento a join prontuario pr on pr.id = a.prontuario_id
 				join paciente p on p.id = pr.paciente_id where a.id = ?""", String.class, internado);
-		admitirCpf(administrativoA, hospitalA, cpfInternado, "Já Internado");
+		admitirCpf(hospitalA, cpfInternado, "Já Internado");
 		// Quem já teve alta pode ser internado de novo: o atendimento novo aparece.
-		UUID comAlta = admitir(administrativoA, hospitalA, "Teve Alta");
+		UUID comAlta = admitir(hospitalA, "Teve Alta");
 		UUID internacaoComAlta = internar(administrativoA, comAlta, leito(administrativoA, hospitalA, "E-5", "ENFERMARIA"));
 		como(administrativoA, post("/internacoes/{id}/alta", internacaoComAlta)
 				.content("{\"resumoAltaId\":\"%s\"}".formatted(resumoDeAlta(comAlta, "Dr. Alta")))).andExpect(status().isOk());
@@ -153,7 +153,7 @@ class InternacoesDaInstituicaoTest extends TesteIntegracao {
 		String cpfComAlta = jdbc.queryForObject("""
 				select p.cpf from atendimento a join prontuario pr on pr.id = a.prontuario_id
 				join paciente p on p.id = pr.paciente_id where a.id = ?""", String.class, comAlta);
-		UUID voltou = admitirCpf(administrativoA, hospitalA, cpfComAlta, "Teve Alta");
+		UUID voltou = admitirCpf(hospitalA, cpfComAlta, "Teve Alta");
 
 		List<Map<String, Object>> semLeito = lista(como(administrativoA, get("/internacoes/atendimentos-sem-leito")
 				.param("instituicaoId", hospitalA.getId().toString())).andExpect(status().isOk()));
@@ -174,12 +174,13 @@ class InternacoesDaInstituicaoTest extends TesteIntegracao {
 				.andExpect(status().isForbidden());
 	}
 
-	private UUID admitir(String administrativo, Instituicao hospital, String nome) throws Exception {
-		return admitirCpf(administrativo, hospital, Cenario.novoCpf(), nome);
+	private UUID admitir(Instituicao hospital, String nome) throws Exception {
+		return admitirCpf(hospital, Cenario.novoCpf(), nome);
 	}
 
-	private UUID admitirCpf(String administrativo, Instituicao hospital, String cpf, String nome) throws Exception {
-		return id(como(administrativo, post("/api/pacientes/admissoes").content("""
+	private UUID admitirCpf(Instituicao hospital, String cpf, String nome) throws Exception {
+		return id(mvc.perform(post("/api/pacientes/admissoes").with(user(cenario.recepcao(hospital)).roles("RECEPCAO")).with(csrf())
+				.contentType(MediaType.APPLICATION_JSON).content("""
 				{"cpf":"%s","nome":"%s","dataNascimento":"1980-05-17","instituicaoId":"%s","motivo":"Febre alta"}
 				""".formatted(cpf, nome, hospital.getId()))).andExpect(status().isCreated()), "$.atendimentoId");
 	}

@@ -64,7 +64,7 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 	@Test
 	void primeiroCadastroCriaPacienteProntuarioConsentimentoEAtendimento() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
-		String admin = cenario.administrativo(hospital);
+		String admin = cenario.recepcao(hospital);
 		String cpf = Cenario.novoCpf();
 
 		MvcResult resultado = mvc.perform(admissao(admin, novoCadastro(cpf, hospital.getId(), "AUTORIZADO")))
@@ -105,8 +105,8 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 	void mesmoCpfEmOutraInstituicaoReaproveitaOProntuario() throws Exception {
 		Instituicao hospitalA = cenario.instituicao(true);
 		Instituicao hospitalB = cenario.instituicao(true);
-		String adminA = cenario.administrativo(hospitalA);
-		String adminB = cenario.administrativo(hospitalB);
+		String adminA = cenario.recepcao(hospitalA);
+		String adminB = cenario.recepcao(hospitalB);
 		String cpf = Cenario.novoCpf();
 
 		MvcResult primeiro = mvc.perform(admissao(adminA, novoCadastro(cpf, hospitalA.getId(), "AUTORIZADO")))
@@ -149,7 +149,7 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 	@Test
 	void semManifestacaoDeConsentimentoOAtendimentoAconteceESemRegistroDeConsentimento() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
-		String admin = cenario.administrativo(hospital);
+		String admin = cenario.recepcao(hospital);
 		String corpo = """
 				{"cpf":"%s","nome":"Paciente Inconsciente","dataNascimento":"1970-01-01",
 				 "instituicaoId":"%s","motivo":"Trauma"}
@@ -164,7 +164,7 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 	@Test
 	void consentimentoNegadoNaoImpedeOAtendimento() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
-		String admin = cenario.administrativo(hospital);
+		String admin = cenario.recepcao(hospital);
 
 		MvcResult resultado = mvc.perform(admissao(admin, novoCadastro(Cenario.novoCpf(), hospital.getId(), "NEGADO")))
 				.andExpect(status().isCreated()).andReturn();
@@ -178,7 +178,7 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 	@ValueSource(strings = {"52998224724", "11111111111", "5299822472", "529.982.247/25", "abcdefghijk"})
 	void cpfInvalidoRetorna400SemGravarNadaESemEcoarOValor(String cpfInvalido) throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
-		String admin = cenario.administrativo(hospital);
+		String admin = cenario.recepcao(hospital);
 		long pacientesAntes = pacienteRepository.count();
 		long atendimentosAntes = atendimentoRepository.count();
 
@@ -195,7 +195,7 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 	@Test
 	void primeiroCadastroSemNomeEDataDeNascimentoRetorna400ComOsCampos() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
-		String admin = cenario.administrativo(hospital);
+		String admin = cenario.recepcao(hospital);
 		String cpf = Cenario.novoCpf();
 		String corpo = """
 				{"cpf":"%s","nome":"   ","instituicaoId":"%s","motivo":"Febre"}
@@ -212,7 +212,7 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 	@Test
 	void camposInvalidosRetornam400() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
-		String admin = cenario.administrativo(hospital);
+		String admin = cenario.recepcao(hospital);
 		String corpo = """
 				{"cpf":"%s","nome":"%s","dataNascimento":"2999-01-01","instituicaoId":"%s","motivo":" "}
 				""".formatted(Cenario.novoCpf(), "x".repeat(151), hospital.getId());
@@ -231,7 +231,7 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 	@Test
 	void dataDeNascimentoNoFuturoUsaOFusoDaAplicacao() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
-		String admin = cenario.administrativo(hospital);
+		String admin = cenario.recepcao(hospital);
 		relogio.definir(LocalDateTime.of(2026, 11, 10, 22, 0).atZone(RelogioDeTeste.FUSO).toInstant());
 		String corpo = """
 				{"cpf":"%s","nome":"Maria Fictícia","dataNascimento":"%s","instituicaoId":"%s","motivo":"Febre"}
@@ -247,7 +247,7 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 	@Test
 	void manifestacaoForaDasOpcoesOuJsonMalformadoRetorna400() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
-		String admin = cenario.administrativo(hospital);
+		String admin = cenario.recepcao(hospital);
 
 		mvc.perform(admissao(admin, novoCadastro(Cenario.novoCpf(), hospital.getId(), "REVOGADO")))
 				.andExpect(status().isBadRequest())
@@ -256,10 +256,10 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 	}
 
 	@Test
-	void administrativoDeOutraInstituicaoRecebe403ENadaECriado() throws Exception {
+	void recepcaoDeOutraInstituicaoRecebe403ENadaECriado() throws Exception {
 		Instituicao hospitalA = cenario.instituicao(true);
 		Instituicao hospitalB = cenario.instituicao(true);
-		String adminA = cenario.administrativo(hospitalA);
+		String adminA = cenario.recepcao(hospitalA);
 		String cpf = Cenario.novoCpf();
 
 		mvc.perform(admissao(adminA, novoCadastro(cpf, hospitalB.getId(), "AUTORIZADO")))
@@ -274,8 +274,8 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 	void vinculoEncerradoOuAindaNaoIniciadoRecebe403() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
 		LocalDateTime agora = LocalDateTime.ofInstant(INICIO, RelogioDeTeste.FUSO);
-		String encerrado = cenario.vinculo(hospital, Perfil.ADMINISTRATIVO, agora.minusDays(10), agora.minusDays(1));
-		String futuro = cenario.vinculo(hospital, Perfil.ADMINISTRATIVO, agora.plusDays(1), null);
+		String encerrado = cenario.vinculo(hospital, Perfil.RECEPCAO, agora.minusDays(10), agora.minusDays(1));
+		String futuro = cenario.vinculo(hospital, Perfil.RECEPCAO, agora.plusDays(1), null);
 		String outroPerfilNoVinculo = cenario.vinculo(hospital, Perfil.MEDICO, agora.minusDays(10), null);
 
 		for (String login : List.of(encerrado, futuro, outroPerfilNoVinculo)) {
@@ -285,13 +285,13 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 	}
 
 	@Test
-	void perfilQueNaoEAdministrativoRecebe403() throws Exception {
+	void perfilQueNaoERecepcaoRecebe403() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
 		String corpo = novoCadastro(Cenario.novoCpf(), hospital.getId(), "AUTORIZADO");
 
 		String buscaValida = "{\"cpf\":\"%s\",\"instituicaoId\":\"%s\"}".formatted(Cenario.novoCpf(), hospital.getId());
 
-		for (String papel : List.of("MEDICO", "ENFERMEIRO", "PACIENTE", "AUDITOR_GESTOR")) {
+		for (String papel : List.of("ADMINISTRATIVO", "MEDICO", "ENFERMEIRO", "PACIENTE", "AUDITOR_GESTOR")) {
 			mvc.perform(post("/api/pacientes/admissoes").with(user("qualquer").roles(papel)).with(csrf())
 							.contentType(MediaType.APPLICATION_JSON).content(corpo))
 					.andExpect(status().isForbidden());
@@ -314,7 +314,7 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 	@Test
 	void instituicaoNaoCredenciadaRecebe422() throws Exception {
 		Instituicao naoCredenciada = cenario.instituicao(false);
-		String admin = cenario.administrativo(naoCredenciada);
+		String admin = cenario.recepcao(naoCredenciada);
 		String cpf = Cenario.novoCpf();
 
 		mvc.perform(admissao(admin, novoCadastro(cpf, naoCredenciada.getId(), "AUTORIZADO")))
@@ -329,10 +329,10 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 		Instituicao hospitalA = cenario.instituicao(true);
 		Instituicao hospitalB = cenario.instituicao(true);
 		String cpf = Cenario.novoCpf();
-		MvcResult admissao = mvc.perform(admissao(cenario.administrativo(hospitalA),
+		MvcResult admissao = mvc.perform(admissao(cenario.recepcao(hospitalA),
 				novoCadastro(cpf, hospitalA.getId(), "AUTORIZADO"))).andReturn();
 
-		MvcResult resultado = mvc.perform(busca(cenario.administrativo(hospitalB), Cenario.comMascara(cpf),
+		MvcResult resultado = mvc.perform(busca(cenario.recepcao(hospitalB), Cenario.comMascara(cpf),
 						hospitalB.getId()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.id").value(uuid(admissao, "$.pacienteId").toString()))
@@ -347,7 +347,7 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 	@Test
 	void buscaDeCpfInexistenteRetorna404() throws Exception {
 		Instituicao hospital = cenario.instituicao(true);
-		mvc.perform(busca(cenario.administrativo(hospital), Cenario.novoCpf(), hospital.getId()))
+		mvc.perform(busca(cenario.recepcao(hospital), Cenario.novoCpf(), hospital.getId()))
 				.andExpect(status().isNotFound());
 	}
 
@@ -356,7 +356,7 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 		Instituicao hospitalA = cenario.instituicao(true);
 		Instituicao hospitalB = cenario.instituicao(true);
 		String cpf = Cenario.novoCpf();
-		String adminA = cenario.administrativo(hospitalA);
+		String adminA = cenario.recepcao(hospitalA);
 		mvc.perform(admissao(adminA, novoCadastro(cpf, hospitalA.getId(), "AUTORIZADO")))
 				.andExpect(status().isCreated());
 
@@ -373,8 +373,8 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 	void cadastrosSimultaneosDoMesmoCpfNaoDuplicamEVinculamAoMesmoProntuario() throws Exception {
 		Instituicao hospitalA = cenario.instituicao(true);
 		Instituicao hospitalB = cenario.instituicao(true);
-		String adminA = cenario.administrativo(hospitalA);
-		String adminB = cenario.administrativo(hospitalB);
+		String adminA = cenario.recepcao(hospitalA);
+		String adminB = cenario.recepcao(hospitalB);
 		String cpf = Cenario.novoCpf();
 		CountDownLatch largada = new CountDownLatch(1);
 
@@ -409,12 +409,12 @@ class AdmissaoPacienteTest extends TesteIntegracao {
 	}
 
 	private MockHttpServletRequestBuilder admissao(String login, String corpo) {
-		return post("/api/pacientes/admissoes").with(user(login).roles("ADMINISTRATIVO")).with(csrf())
+		return post("/api/pacientes/admissoes").with(user(login).roles("RECEPCAO")).with(csrf())
 				.contentType(MediaType.APPLICATION_JSON).content(corpo);
 	}
 
 	private MockHttpServletRequestBuilder busca(String login, String cpf, UUID instituicaoId) {
-		return post("/api/pacientes/busca").with(user(login).roles("ADMINISTRATIVO")).with(csrf())
+		return post("/api/pacientes/busca").with(user(login).roles("RECEPCAO")).with(csrf())
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("{\"cpf\":\"%s\",\"instituicaoId\":\"%s\"}".formatted(cpf, instituicaoId));
 	}

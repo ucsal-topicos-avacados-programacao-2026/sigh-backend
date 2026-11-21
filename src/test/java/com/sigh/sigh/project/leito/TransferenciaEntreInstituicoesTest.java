@@ -59,7 +59,8 @@ class TransferenciaEntreInstituicoesTest extends TesteIntegracao {
 		hospitalB = cenario.instituicao(true);
 		administrativoA = cenario.administrativo(hospitalA);
 		administrativoB = cenario.administrativo(hospitalB);
-		atendimentoId = id(como(administrativoA, post("/api/pacientes/admissoes").content("""
+		atendimentoId = id(mvc.perform(post("/api/pacientes/admissoes").with(user(cenario.recepcao(hospitalA)).roles("RECEPCAO")).with(csrf())
+				.contentType(MediaType.APPLICATION_JSON).content("""
 				{"cpf":"%s","nome":"Maria Fictícia","dataNascimento":"1980-05-17",
 				 "consentimentoInicial":"AUTORIZADO","instituicaoId":"%s","motivo":"Pneumonia"}
 				""".formatted(Cenario.novoCpf(), hospitalA.getId()))).andExpect(status().isCreated()), "$.atendimentoId");
