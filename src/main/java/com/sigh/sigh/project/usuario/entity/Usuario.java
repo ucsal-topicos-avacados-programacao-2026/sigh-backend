@@ -26,6 +26,10 @@ public class Usuario {
 	private String nome;
 	private String senhaHash;
 	private boolean mfaHabilitado;
+
+	private boolean ativo = true;
+
+	private boolean senhaTemporaria;
 	@Transient
 	@Cifrado(gravadoEm = "mfaSegredoCifrado")
 	private String mfaSegredo;

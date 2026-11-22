@@ -21,6 +21,7 @@ public class TokenService {
 
 	public static final String CLAIM_AUTORIZACOES = "autorizacoes";
 	public static final String SEGUNDO_FATOR_PENDENTE = "SEGUNDO_FATOR_PENDENTE";
+	public static final String SENHA_PENDENTE = "SENHA_PENDENTE";
 	private static final String PREFIXO_PERFIL = "ROLE_";
 
 	private final JwtEncoder codificadorDeToken;
@@ -36,6 +37,10 @@ public class TokenService {
 
 	public String gerarTokenDeSegundoFator(Usuario usuario) {
 		return gerar(usuario.getLogin(), List.of(SEGUNDO_FATOR_PENDENTE), jwtProperties.validadeSegundoFatorPendente());
+	}
+
+	public String gerarTokenDeSenha(Usuario usuario) {
+		return gerar(usuario.getLogin(), List.of(SENHA_PENDENTE), jwtProperties.validadeSegundoFatorPendente());
 	}
 
 	private String gerar(String login, List<String> autorizacoes, Duration validade) {
