@@ -1,0 +1,11 @@
+package com.sigh.sigh.project.usuario.entity;
+
+public enum TipoDeAcaoAdministrativa {
+	USUARIO_CRIADO,
+	USUARIO_DESATIVADO,
+	USUARIO_REATIVADO,
+	SENHA_REDEFINIDA,
+	SEGUNDO_FATOR_ZERADO,
+	VINCULO_ADICIONADO,
+	VINCULO_ENCERRADO
+}
