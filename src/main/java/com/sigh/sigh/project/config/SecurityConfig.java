@@ -1,7 +1,9 @@
 package com.sigh.sigh.project.config;
 
+import org.springframework.security.authentication.BadCredentialsException;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.sigh.sigh.project.usuario.entity.Perfil;
+import com.sigh.sigh.project.usuario.repository.UsuarioRepository;
 import com.sigh.sigh.project.usuario.service.TokenService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -34,7 +36,8 @@ import java.util.List;
 public class SecurityConfig {
 
 	@Bean
-	public SecurityFilterChain filtroDeSeguranca(HttpSecurity http) throws Exception {
+	public SecurityFilterChain filtroDeSeguranca(HttpSecurity http, JwtAuthenticationConverter conversorDeToken,
+			UsuarioRepository usuarioRepository) throws Exception {
 		http
 				.csrf(AbstractHttpConfigurer::disable)
 				.cors(Customizer.withDefaults())
@@ -43,8 +46,14 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
 						.requestMatchers("/error").permitAll()
 						.requestMatchers("/auth/segundo-fator/**").hasAuthority(TokenService.SEGUNDO_FATOR_PENDENTE)
+						.requestMatchers("/auth/senha/troca-inicial").hasAuthority(TokenService.SENHA_PENDENTE)
 						.anyRequest().hasAnyRole(nomesDosPerfis()))
-				.oauth2ResourceServer(servidor -> servidor.jwt(Customizer.withDefaults()));
+				.oauth2ResourceServer(servidor -> servidor.jwt(jwt -> jwt.jwtAuthenticationConverter(token -> {
+					if (!usuarioRepository.existsByLoginAndAtivoTrue(token.getSubject())) {
+						throw new BadCredentialsException("Usuário inativo.");
+					}
+					return conversorDeToken.convert(token);
+				})));
 		return http.build();
 	}
 
