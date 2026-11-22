@@ -31,7 +31,15 @@ public class AutenticacaoService {
 	public TokenResponseDTO entrar(LoginRequestDTO dados) {
 		Usuario usuario = usuarioRepository.findByLogin(dados.login())
 				.filter(encontrado -> codificadorDeSenha.matches(dados.senha(), encontrado.getSenhaHash()))
+				.filter(Usuario::isAtivo)
 				.orElseThrow(() -> new CredenciaisInvalidasException("Login ou senha inválidos."));
+		if (usuario.isSenhaTemporaria()) {
+			return new TokenResponseDTO(tokenService.gerarTokenDeSenha(usuario), EtapaAutenticacao.TROCAR_SENHA);
+		}
+		return proximaEtapa(usuario);
+	}
+
+	public TokenResponseDTO proximaEtapa(Usuario usuario) {
 		if (!exigeSegundoFator(usuario)) {
 			return new TokenResponseDTO(tokenService.gerarTokenDeAcesso(usuario), EtapaAutenticacao.ACESSO_LIBERADO);
 		}

@@ -57,10 +57,12 @@ class VinculoEmTodaRotaTest extends TesteIntegracao {
 			"GET /api/instituicoes", "lista de instituições credenciadas da rede (só id e nome), para escolher o"
 					+ " destino de uma transferência; não traz dado de paciente (FE-04)",
 			"GET /usuarios/eu", "dados do próprio usuário logado, inclusive os vínculos dele: é com isso que o"
-					+ " front-end sabe em que instituição ele pode operar; não traz dado de paciente (FE-02)");
+					+ " front-end sabe em que instituição ele pode operar; não traz dado de paciente (FE-02)",
+			"POST /auth/senha/alteracao", "troca da própria senha, confirmada pela senha atual: age só sobre o usuário"
+					+ " logado e não toca em dado de instituição nem de paciente");
 
 	private static final Set<String> SEM_PREAUTHORIZE = Set.of("POST /auth/login", "POST /auth/segundo-fator/cadastro",
-			"POST /auth/segundo-fator/validacao");
+			"POST /auth/segundo-fator/validacao", "POST /auth/senha/troca-inicial");
 
 	private static final String REGISTRO = """
 			{"tipo":"DIAGNOSTICO","conteudo":"Pneumonia","categoriaInformacao":"Clínica geral"}
