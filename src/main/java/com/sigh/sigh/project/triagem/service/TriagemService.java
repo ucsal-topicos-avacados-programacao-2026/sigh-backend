@@ -130,6 +130,9 @@ public class TriagemService {
 		vinculoService.exigirVinculoAtivo(loginEnfermeiro, triagem.getAtendimento().getInstituicao().getId(),
 				Perfil.ENFERMEIRO);
 		triagem = buscarTriagemNaoConfirmada(triagemId);
+		if (triagem.getAtendimento().getStatus() == StatusAtendimento.ABERTO) {
+			triagem.getAtendimento().setStatus(StatusAtendimento.EM_TRIAGEM);
+		}
 		triagem.setCorConfirmada(cor);
 		triagem.setConfirmadaEm(LocalDateTime.now(clock));
 		triagem.setConfirmador(usuarioService.buscarPorLogin(loginEnfermeiro));
