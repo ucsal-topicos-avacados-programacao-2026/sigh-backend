@@ -165,6 +165,28 @@ A **Recepção** (perfil `RECEPCAO`, com vínculo na instituição e segundo fat
 
 **Andamento para a recepção:** `GET /triagens/pre-classificacao?atendimentoId=&instituicaoId=` devolve só `situacao` (`EM_ANDAMENTO`, `PRONTA`, `INDISPONIVEL`), nunca a cor. Provado em `PreClassificacaoNaAdmissaoTest`.
 
+## Gestão de usuários (Auditor/Gestor)
+
+Quem cria e administra os usuários é o **Auditor/Gestor da rede**. O primeiro auditor é criado pela TI da instituição, fora da API. Paciente não tem conta de acesso: ele é cadastrado pela recepção, no atendimento (a recepção só vincula uma conta se ela existir).
+
+| Rota | O que faz |
+|---|---|
+| `POST /usuarios` | Cria o usuário com login, nome, perfis e, para perfis de instituição, os vínculos (hospital, perfis habilitados e registro profissional). Devolve a **senha temporária, uma única vez**. |
+| `GET /usuarios` | Lista e busca (`busca`, `perfil`, `ativo`, paginação), com os vínculos. |
+| `PATCH /usuarios/{id}/ativo` | Desativa ou reativa. Nunca apaga, para preservar a auditoria. |
+| `POST /usuarios/{id}/senha-temporaria` | Redefine a senha: gera outra temporária. |
+| `POST /usuarios/{id}/segundo-fator/reinicio` | Zera o 2FA, e o usuário cadastra o autenticador de novo no próximo login. |
+| `POST /usuarios/{id}/vinculos` e `.../{vinculoId}/encerramento` | Adiciona e encerra vínculos com hospitais. |
+| `GET /usuarios/acoes` | Histórico imutável das ações administrativas (quem fez, o quê, em quem, quando). |
+
+**Regras:**
+- **Senha:** aleatória, com 16 caracteres, gerada pelo sistema. Só o hash (BCrypt) fica no banco. No primeiro login, e depois de uma redefinição, o login devolve a etapa `TROCAR_SENHA` e a API só aceita `POST /auth/senha/troca-inicial` (nova senha com 10 a 72 caracteres, letras e números, diferente do login e da atual). Depois dela seguem o 2FA (se o perfil exigir) e o acesso. Qualquer usuário troca a própria senha em `POST /auth/senha/alteracao`, informando a atual.
+- **Perfis:** Auditor/Gestor não combina com outros perfis, e `PACIENTE` não é criado por aqui. Médico e enfermeiro exigem registro profissional (CRM ou COREN), e todo perfil de instituição exige ao menos um vínculo. Não pode haver dois vínculos ativos do mesmo usuário na mesma instituição.
+- **Desativação:** o usuário desativado não entra, e o token que já tinha deixa de valer na hora (a API confere em cada requisição). O auditor não desativa a si mesmo, e a rede mantém ao menos um auditor ativo.
+- **Usuários de demonstração:** a senha deles já vale como definitiva, sem troca no primeiro acesso.
+
+Provado em `GestaoDeUsuariosTest` e, para as rotas e os perfis, no `VinculoEmTodaRotaTest`.
+
 ## Integração com o front-end (FE-02)
 
 O front-end (`sigh-frontend`) roda em outra origem e chama a API direto, com o token no cabeçalho `Authorization`. Não há proxy no meio, que seria um intermediário lendo o tráfego (RNF-004).
