@@ -169,6 +169,28 @@ class PreClassificacaoNaAdmissaoTest extends TesteIntegracao {
 	}
 
 	@Test
+	void confirmarSemRegistrarSinaisVitaisColocaOPacienteNaFilaDoMedico() throws Exception {
+		when(clienteIA.classificarRisco(anyString())).thenReturn(CorRisco.AMARELO);
+		String medico = cenario.profissional(hospital, Perfil.MEDICO);
+		UUID atendimento = admitir(recepcao, hospital, Cenario.novoCpf(), "Dor de cabeça forte", "AUTORIZADO");
+		esperarSituacao(atendimento, "PRONTA");
+		UUID triagem = UUID.fromString((String) pendenteDe(atendimento).get("id"));
+
+		como(medico, "MEDICO", get("/triagens/fila").param("instituicaoId", hospital.getId().toString()))
+				.andExpect(jsonPath("$.content[?(@.atendimentoId == '" + atendimento + "')]").isEmpty());
+
+		como(enfermeiro, "ENFERMEIRO", post("/triagens/{id}/confirmacao", triagem).content("{\"cor\":\"AMARELO\"}"))
+				.andExpect(status().isOk());
+
+		String fila = como(medico, "MEDICO", get("/triagens/fila").param("instituicaoId", hospital.getId().toString()))
+				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+		List<String> cores = JsonPath.read(fila, "$.content[?(@.atendimentoId == '" + atendimento + "')].corConfirmada");
+		assertThat(cores).containsExactly("AMARELO");
+		assertThat(jdbc.queryForObject("select status from atendimento where id = ?", String.class, atendimento))
+				.isEqualTo("EM_TRIAGEM");
+	}
+
+	@Test
 	void soARecepcaoDaInstituicaoVeOAndamentoEOEnfermeiroNaoAdmite() throws Exception {
 		when(clienteIA.classificarRisco(anyString())).thenReturn(CorRisco.VERDE);
 		UUID atendimento = admitir(recepcao, hospital, Cenario.novoCpf(), "Corte leve", "AUTORIZADO");
